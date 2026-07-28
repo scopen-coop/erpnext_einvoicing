@@ -1,0 +1,153 @@
+{
+ "actions": [],
+ "autoname": "field:provider_name",
+ "creation": "2026-07-28 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "general_section",
+  "provider_name",
+  "provider_type",
+  "column_break_general",
+  "is_enabled",
+  "is_standard",
+  "endpoints_section",
+  "prod_api_url",
+  "test_api_url",
+  "column_break_endpoints",
+  "prod_token_url",
+  "test_token_url",
+  "auth_section",
+  "auth_type",
+  "api_key_header",
+  "column_break_auth",
+  "auth_payload_map"
+ ],
+ "fields": [
+  {
+   "fieldname": "general_section",
+   "fieldtype": "Section Break",
+   "label": "General"
+  },
+  {
+   "fieldname": "provider_name",
+   "fieldtype": "Data",
+   "label": "Platform Name",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "provider_type",
+   "fieldtype": "Select",
+   "label": "Provider Type",
+   "options": "Esalink",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "column_break_general",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "fieldname": "is_enabled",
+   "fieldtype": "Check",
+   "label": "Enabled",
+   "in_list_view": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "is_standard",
+   "fieldtype": "Check",
+   "label": "Standard (Fixture)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "endpoints_section",
+   "fieldtype": "Section Break",
+   "label": "API Endpoints"
+  },
+  {
+   "fieldname": "prod_api_url",
+   "fieldtype": "Data",
+   "label": "Production API URL",
+   "options": "URL"
+  },
+  {
+   "fieldname": "test_api_url",
+   "fieldtype": "Data",
+   "label": "Test API URL",
+   "options": "URL"
+  },
+  {
+   "fieldname": "column_break_endpoints",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "prod_token_url",
+   "fieldtype": "Data",
+   "label": "Production Token URL",
+   "options": "URL"
+  },
+  {
+   "fieldname": "test_token_url",
+   "fieldtype": "Data",
+   "label": "Test Token URL",
+   "options": "URL"
+  },
+  {
+   "fieldname": "auth_section",
+   "fieldtype": "Section Break",
+   "label": "Authentication"
+  },
+  {
+   "default": "OAuth2",
+   "fieldname": "auth_type",
+   "fieldtype": "Select",
+   "label": "Auth Type",
+   "options": "OAuth2\nAPI Key"
+  },
+  {
+   "fieldname": "api_key_header",
+   "fieldtype": "Data",
+   "label": "API Key Header Name",
+   "description": "HTTP header name for the API key, e.g. hubtimize-api-key"
+  },
+  {
+   "fieldname": "column_break_auth",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "auth_payload_map",
+   "fieldtype": "Code",
+   "label": "Auth Payload Map (JSON)",
+   "options": "JSON",
+   "description": "Maps token request fields to eInvoicing Settings fields. e.g. {\"client_id\": \"username\", \"client_secret\": \"password\", \"grant_type\": \"client_credentials\"}"
+  }
+ ],
+ "links": [],
+ "modified": "2026-07-28 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "ERPNext eInvoicing",
+ "name": "Approved Platforms",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

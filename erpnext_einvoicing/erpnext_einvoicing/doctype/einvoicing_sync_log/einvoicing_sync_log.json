@@ -1,0 +1,117 @@
+{
+ "actions": [],
+ "creation": "2026-07-28 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "general_section",
+  "sync_type",
+  "approved_platform",
+  "column_break_general",
+  "last_sync_date",
+  "last_sync_status",
+  "counts_section",
+  "flows_total",
+  "flows_synced",
+  "column_break_counts",
+  "flows_skipped",
+  "flows_error"
+ ],
+ "fields": [
+  {
+   "fieldname": "general_section",
+   "fieldtype": "Section Break",
+   "label": "General"
+  },
+  {
+   "fieldname": "sync_type",
+   "fieldtype": "Select",
+   "label": "Sync Type",
+   "options": "Purchase Invoice\nCustomer Invoice",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "approved_platform",
+   "fieldtype": "Link",
+   "label": "Approved Platform",
+   "options": "Approved Platforms",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "column_break_general",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "last_sync_date",
+   "fieldtype": "Datetime",
+   "label": "Sync Date",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "last_sync_status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "ok\npartial\nerror",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "counts_section",
+   "fieldtype": "Section Break",
+   "label": "Flow Counts"
+  },
+  {
+   "default": "0",
+   "fieldname": "flows_total",
+   "fieldtype": "Int",
+   "label": "Total"
+  },
+  {
+   "default": "0",
+   "fieldname": "flows_synced",
+   "fieldtype": "Int",
+   "label": "Synced"
+  },
+  {
+   "fieldname": "column_break_counts",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "flows_skipped",
+   "fieldtype": "Int",
+   "label": "Skipped"
+  },
+  {
+   "default": "0",
+   "fieldname": "flows_error",
+   "fieldtype": "Int",
+   "label": "Errors"
+  }
+ ],
+ "links": [],
+ "modified": "2026-07-28 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "ERPNext eInvoicing",
+ "name": "eInvoicing Sync Log",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1
+  }
+ ],
+ "sort_field": "last_sync_date",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 0
+}

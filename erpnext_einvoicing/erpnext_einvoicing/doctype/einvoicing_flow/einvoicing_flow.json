@@ -1,0 +1,135 @@
+{
+ "actions": [],
+ "autoname": "field:flow_id",
+ "creation": "2026-07-28 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "general_section",
+  "flow_id",
+  "approved_platform",
+  "column_break_general",
+  "flow_type",
+  "flow_direction",
+  "tracking_section",
+  "ack_status",
+  "tracking_id",
+  "column_break_tracking",
+  "submitted_at",
+  "updated_at",
+  "document_section",
+  "document_type",
+  "document_name"
+ ],
+ "fields": [
+  {
+   "fieldname": "general_section",
+   "fieldtype": "Section Break",
+   "label": "General"
+  },
+  {
+   "fieldname": "flow_id",
+   "fieldtype": "Data",
+   "label": "Flow ID",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "approved_platform",
+   "fieldtype": "Link",
+   "label": "Approved Platform",
+   "options": "Approved Platforms",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "column_break_general",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "flow_type",
+   "fieldtype": "Select",
+   "label": "Flow Type",
+   "options": "Purchase Invoice\nCustomer Invoice",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "flow_direction",
+   "fieldtype": "Select",
+   "label": "Direction",
+   "options": "In\nOut",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "tracking_section",
+   "fieldtype": "Section Break",
+   "label": "Tracking"
+  },
+  {
+   "fieldname": "ack_status",
+   "fieldtype": "Data",
+   "label": "Acknowledgement Status"
+  },
+  {
+   "fieldname": "tracking_id",
+   "fieldtype": "Data",
+   "label": "Tracking ID"
+  },
+  {
+   "fieldname": "column_break_tracking",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "submitted_at",
+   "fieldtype": "Datetime",
+   "label": "Submitted At"
+  },
+  {
+   "fieldname": "updated_at",
+   "fieldtype": "Datetime",
+   "label": "Updated At"
+  },
+  {
+   "fieldname": "document_section",
+   "fieldtype": "Section Break",
+   "label": "Linked Document"
+  },
+  {
+   "fieldname": "document_type",
+   "fieldtype": "Link",
+   "label": "Document Type",
+   "options": "DocType"
+  },
+  {
+   "fieldname": "document_name",
+   "fieldtype": "Dynamic Link",
+   "label": "Document",
+   "options": "document_type"
+  }
+ ],
+ "links": [],
+ "modified": "2026-07-28 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "ERPNext eInvoicing",
+ "name": "eInvoicing Flow",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "updated_at",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 0
+}

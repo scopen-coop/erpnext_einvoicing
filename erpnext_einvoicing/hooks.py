@@ -1,3 +1,6 @@
+# Copyright (c) 2026, Scopen and contributors
+# For license information, please see license.txt
+
 app_name = "erpnext_einvoicing"
 app_title = "ERPNext eInvoicing"
 app_publisher = "Scopen"
@@ -8,7 +11,7 @@ app_license = "gpl-3.0"
 # Apps
 # ------------------
 
-# required_apps = []
+required_apps = ["frappe", "erpnext"]
 
 # Each item in the list will be shown as an app in the apps page
 # add_to_apps_screen = [
@@ -138,34 +141,37 @@ app_license = "gpl-3.0"
 # ---------------
 # Hook on document methods and events
 
-# doc_events = {
-# 	"*": {
-# 		"on_update": "method",
-# 		"on_cancel": "method",
-# 		"on_trash": "method"
-# 	}
-# }
+doc_events = {
+	"Purchase Invoice": {
+		"on_submit": "erpnext_einvoicing.erpnext_einvoicing.doctype.epurchase_invoice.epurchase_invoice.on_purchase_invoice_submit",
+	}
+}
 
 # Scheduled Tasks
 # ---------------
 
-# scheduler_events = {
-# 	"all": [
-# 		"erpnext_einvoicing.tasks.all"
-# 	],
-# 	"daily": [
-# 		"erpnext_einvoicing.tasks.daily"
-# 	],
-# 	"hourly": [
-# 		"erpnext_einvoicing.tasks.hourly"
-# 	],
-# 	"weekly": [
-# 		"erpnext_einvoicing.tasks.weekly"
-# 	],
-# 	"monthly": [
-# 		"erpnext_einvoicing.tasks.monthly"
-# 	],
-# }
+scheduler_events = {
+	"cron": {
+		"*/30 * * * *": [
+			"erpnext_einvoicing.providers.sync.sync_incoming_flows",
+		]
+	},
+	# "all": [
+	# 	"erpnext_einvoicing.tasks.all"
+	# ],
+	# "daily": [
+	# 	"erpnext_einvoicing.tasks.daily"
+	# ],
+	# "hourly": [
+	# 	"erpnext_einvoicing.tasks.hourly"
+	# ],
+	# "weekly": [
+	# 	"erpnext_einvoicing.tasks.weekly"
+	# ],
+	# "monthly": [
+	# 	"erpnext_einvoicing.tasks.monthly"
+	# ],
+}
 
 # Testing
 # -------
@@ -247,12 +253,15 @@ app_license = "gpl-3.0"
 # Automatically update python controller files with type annotations for this app.
 # export_python_type_annotations = True
 
-# default_log_clearing_doctypes = {
-# 	"Logging DocType Name": 30  # days to retain logs
-# }
+after_install = "erpnext_einvoicing.install.after_install"
 
+# Log retention
+# -------------
+
+default_log_clearing_doctypes = {
+	"eInvoicing Sync Log": 90,
+}
 # Translation
 # ------------
 # List of apps whose translatable strings should be excluded from this app's translations.
 # ignore_translatable_strings_from = []
-
