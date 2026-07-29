@@ -31,7 +31,8 @@ class EsalinkProvider(BaseProvider):
 				title=frappe._("Missing Configuration"),
 			)
 		headers = {
-			"Content-Type": "application/x-www-form-urlencoded",
+			"Content-Type": "application/json",
+			"Accept": "application/json",
 			**self._build_api_key_header(),
 		}
 		try:
@@ -155,7 +156,11 @@ class EsalinkProvider(BaseProvider):
 		payload = self._build_search_payload(sync_type, limit=1)
 		result = self.call_api("flows/search", "POST", params=payload)
 		if result["status_code"] not in (200, 202):
-			return {"has_pending": False, "total": 0}
+			return {
+				"has_pending": False,
+				"total": 0,
+				"error": f"HTTP {result['status_code']}",
+			}
 		total = result["response"].get("total", 0)
 		return {"has_pending": total > 0, "total": total}
 
