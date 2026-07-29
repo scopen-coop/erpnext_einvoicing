@@ -23,20 +23,34 @@ class EsalinkProvider(BaseProvider):
 	### Authentication
 
 	def get_access_token(self) -> str:
-		payload = self._build_auth_payload()
+		import base64
+		from urllib.parse import quote
+
 		token_url = self.platform.prod_token_url if self.settings.live_mode else self.platform.test_token_url
 		if not token_url:
 			frappe.throw(
 				frappe._("Token URL not configured on platform '{0}'.").format(self.platform.name),
 				title=frappe._("Missing Configuration"),
 			)
+
+		client_id = self.settings.client_id or ""
+		client_secret = self.settings.get_password("client_secret") or ""
+		encoded = base64.b64encode(
+			f"{quote(client_id, safe='')}:{quote(client_secret, safe='')}".encode()
+		).decode()
+
 		headers = {
-			"Content-Type": "application/json",
-			"Accept": "application/json",
+			"Authorization": f"Basic {encoded}",
+			"Content-Type": "application/x-www-form-urlencoded",
 			**self._build_api_key_header(),
 		}
 		try:
-			response = requests.post(token_url, data=payload, headers=headers, timeout=30)
+			response = requests.post(
+				token_url,
+				data="grant_type=client_credentials",
+				headers=headers,
+				timeout=30,
+			)
 			response.raise_for_status()
 		except requests.exceptions.ConnectionError:
 			frappe.throw(
@@ -55,6 +69,7 @@ class EsalinkProvider(BaseProvider):
 				),
 				title=frappe._("Authentication Error"),
 			)
+
 		data = response.json()
 		token = data.get("access_token")
 		if not token:
@@ -62,6 +77,7 @@ class EsalinkProvider(BaseProvider):
 				frappe._("No access_token in response from '{0}'.").format(self.platform.name),
 				title=frappe._("Authentication Error"),
 			)
+
 		self.save_token(token, expires_in=data.get("expires_in"))
 		return token
 
