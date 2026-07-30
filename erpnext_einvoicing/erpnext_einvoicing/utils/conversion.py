@@ -18,6 +18,35 @@ def build_purchase_invoice(epurchase_invoice):
 	pi.buying_price_list = "Standard Buying"
 	pi.einvoice_source = epurchase_invoice.name
 
+	### Résolution du supplier
+	if not epurchase_invoice.matched_supplier and epurchase_invoice.ethirdparty:
+		ethirdparty = frappe.get_doc("eThirdParty", epurchase_invoice.ethirdparty)
+		settings = frappe.get_single("eInvoicing Settings")
+
+		supplier = frappe.new_doc("Supplier")
+		supplier.supplier_name = ethirdparty.party_name
+		supplier.supplier_group = (
+			settings.default_supplier_group
+			or frappe.db.get_single_value("Buying Settings", "supplier_group")
+			or frappe.db.get_value("Supplier Group", {"is_group": 0}, "name")
+		)
+		supplier.tax_id = ethirdparty.siret
+		supplier.categorie_comptable_tiers = ethirdparty.categorie_comptable_tiers or "France"
+		if ethirdparty.zip:
+			supplier.zip = ethirdparty.zip
+		if ethirdparty.city:
+			supplier.city = ethirdparty.city
+		supplier.insert(ignore_permissions=True)
+		frappe.db.commit()
+
+		ethirdparty.db_set("matched_party_type", "Supplier")
+		ethirdparty.db_set("matched_party", supplier.name)
+		ethirdparty.db_set("status", "converted")
+
+		pi.supplier = supplier.name
+	else:
+		pi.supplier = epurchase_invoice.matched_supplier
+
 	if epurchase_invoice.purchase_order:
 		pi.purchase_order = epurchase_invoice.purchase_order
 

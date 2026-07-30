@@ -18,7 +18,9 @@
   "supplier_address_raw",
   "column_break_supplier",
   "supplier_match_status",
+  "supplier_siret",
   "matched_supplier",
+  "ethirdparty",
   "invoice_section",
   "invoice_number",
   "invoice_date",
@@ -118,8 +120,15 @@
    "fieldname": "supplier_match_status",
    "fieldtype": "Select",
    "label": "Supplier Match",
-   "options": "unmatched\nmatched\ncreated",
+   "options": "unmatched\nmatched\nethirdparty\ncreated",
    "in_list_view": 1
+  },
+  {
+   "fieldname": "sirene_status",
+   "fieldtype": "Select",
+   "label": "SIRENE Status",
+   "options": "\nok\nwarning\nnot_found",
+   "read_only": 1
   },
   {
    "fieldname": "matched_supplier",
@@ -127,6 +136,13 @@
    "label": "Matched Supplier",
    "options": "Supplier",
    "in_list_view": 1
+  },
+  {
+   "fieldname": "ethirdparty",
+   "fieldtype": "Link",
+   "label": "eThirdParty",
+   "options": "eThirdParty",
+   "in_list_view": 0
   },
   {
    "fieldname": "invoice_section",
@@ -277,9 +293,18 @@
  "sort_field": "invoice_date",
  "sort_order": "DESC",
  "states": [
-  {"color": "Orange", "title": "pending"},
-  {"color": "Green", "title": "ready"},
-  {"color": "Blue", "title": "converted"}
+  {
+   "color": "Orange",
+   "title": "pending"
+  },
+  {
+   "color": "Green",
+   "title": "ready"
+  },
+  {
+   "color": "Blue",
+   "title": "converted"
+  }
  ],
  "title_field": "supplier_name_raw",
  "track_changes": 1

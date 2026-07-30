@@ -119,7 +119,9 @@ def get_einvoicing_inbox():
 			"supplier_siret",
 			"supplier_vat",
 			"supplier_match_status",
+			"sirene_status",
 			"matched_supplier",
+			"ethirdparty",
 			"purchase_order",
 			"purchase_receipt",
 			"approved_platform",
@@ -146,6 +148,23 @@ def get_einvoicing_inbox():
 			order_by="idx asc",
 		)
 
+		if inv.get("ethirdparty"):
+			inv["ethirdparty_doc"] = frappe.db.get_value(
+				"eThirdParty",
+				inv["ethirdparty"],
+				[
+					"name",
+					"status",
+					"party_name",
+					"siret",
+					"zip",
+					"city",
+					"country_code",
+					"categorie_comptable_tiers",
+				],
+				as_dict=True,
+			)
+
 	return invoices
 
 
@@ -165,22 +184,52 @@ def unlink_matched_supplier(name):
 	doc.matched_supplier = None
 	doc.supplier_match_status = "unmatched"
 	doc.save(ignore_permissions=True)
+
+	frappe.db.set_value(
+		"ePurchase Invoice",
+		name,
+		{
+			"matched_supplier": None,
+			"supplier_match_status": "unmatched",
+			"ethirdparty": None,
+			"sirene_status": None,
+		},
+	)
+	ethirdparty_name = doc.ethirdparty
+	if ethirdparty_name:
+		frappe.delete_doc("eThirdParty", ethirdparty_name, ignore_permissions=True)
+
 	frappe.db.commit()
 	return {"status": "ok"}
 
 
 @frappe.whitelist()
-def create_supplier_from_siret(name):
-	import requests
+def enrich_from_siret(name):
+	import requests as req
 
 	doc = frappe.get_doc("ePurchase Invoice", name)
-	if not doc.supplier_siret:
+
+	siret = (doc.supplier_siret or "").replace(" ", "")
+	if not siret:
 		return {"status": "error", "error": frappe._("No SIRET on this invoice.")}
 
-	siret = doc.supplier_siret.replace(" ", "")
+	ethirdparty_name = doc.ethirdparty or frappe.db.get_value("eThirdParty", {"siret": siret}, "name")
+
+	if ethirdparty_name:
+		ethirdparty = frappe.get_doc("eThirdParty", ethirdparty_name)
+	else:
+		ethirdparty = frappe.new_doc("eThirdParty")
+		ethirdparty.party_type = "Supplier"
+		ethirdparty.siret = siret
+		ethirdparty.vat_number = doc.supplier_vat or ""
+		ethirdparty.party_name = doc.supplier_name_raw or ""
+		ethirdparty.status = "pending"
+		ethirdparty.insert(ignore_permissions=True)
+		doc.db_set("ethirdparty", ethirdparty.name)
+		frappe.db.commit()
 
 	try:
-		response = requests.get(
+		response = req.get(
 			"https://recherche-entreprises.api.gouv.fr/search",
 			params={"q": siret, "per_page": 1},
 			timeout=10,
@@ -192,43 +241,169 @@ def create_supplier_from_siret(name):
 
 	results = data.get("results", [])
 	if not results:
-		return {"status": "error", "error": frappe._("No company found for SIRET {0}.").format(siret)}
+		frappe.db.set_value("ePurchase Invoice", name, "sirene_status", "not_found")
+		frappe.db.commit()
+		return {"status": "not_found"}
 
 	company = results[0]
-	supplier_name = company.get("nom_complet") or doc.supplier_name_raw
-
-	if frappe.db.exists("Supplier", {"supplier_name": supplier_name}):
-		existing = frappe.db.get_value("Supplier", {"supplier_name": supplier_name}, "name")
-		doc.matched_supplier = existing
-		doc.supplier_match_status = "matched"
-		doc.save(ignore_permissions=True)
-		frappe.db.commit()
-		return {"status": "ok", "supplier": existing}
-
-	supplier = frappe.new_doc("Supplier")
-	supplier.supplier_name = supplier_name
-	supplier.supplier_group = (
-		frappe.db.get_single_value("Buying Settings", "supplier_group")
-		or frappe.db.get_value("Supplier Group", {"is_group": 0}, "name")
-		or frappe.db.get_value("Supplier Group", {}, "name")
-	)
-	supplier.tax_id = siret
-
 	siege = company.get("siege", {})
-	if siege.get("code_postal"):
-		supplier.zip = siege["code_postal"]
-	if siege.get("libelle_commune"):
-		supplier.city = siege["libelle_commune"]
 
-	supplier.insert(ignore_permissions=True)
+	ethirdparty.party_name = company.get("nom_complet") or ethirdparty.party_name
+	ethirdparty.address_line1 = siege.get("adresse", "")
+	ethirdparty.zip = siege.get("code_postal", "")
+	ethirdparty.city = siege.get("libelle_commune", "")
+	ethirdparty.country_code = "FR"
+	ethirdparty.sirene_raw = frappe.as_json(company)
+
+	### Dry-run validation
+	import json as _json
+
+	test_supplier = frappe.new_doc("Supplier")
+	test_supplier.supplier_name = ethirdparty.party_name
+	test_supplier.supplier_group = frappe.db.get_single_value(
+		"Buying Settings", "supplier_group"
+	) or frappe.db.get_value("Supplier Group", {"is_group": 0}, "name")
+	test_supplier.tax_id = siret
+	test_supplier.categorie_comptable_tiers = "France"
+
+	missing_fields = [
+		field.label
+		for field in frappe.get_meta("Supplier").fields
+		if field.reqd and not test_supplier.get(field.fieldname)
+	]
+
+	try:
+		test_supplier.run_method("validate")
+	except Exception as e:
+		missing_fields.append(str(e))
+
+	if missing_fields:
+		ethirdparty.status = "warning"
+		ethirdparty.save(ignore_permissions=True)
+		frappe.db.commit()
+		return {
+			"status": "warning",
+			"ethirdparty": ethirdparty.as_dict(),
+			"missing_fields": missing_fields,
+		}
+
+	status = "warning" if missing_fields else "ok"
+	return {
+		"status": status,
+		"data": {
+			"siret": siret,
+			"party_name": ethirdparty.party_name,
+			"address_line1": ethirdparty.address_line1,
+			"zip": ethirdparty.zip,
+			"city": ethirdparty.city,
+			"country_code": ethirdparty.country_code,
+			"categorie_comptable_tiers": ethirdparty.categorie_comptable_tiers,
+		},
+		"missing_fields": missing_fields,
+	}
+
+
+@frappe.whitelist()
+def save_ethirdparty(invoice_name, data, supplier_group):
+	if isinstance(data, str):
+		import json
+
+		data = json.loads(data)
+
+	doc = frappe.get_doc("ePurchase Invoice", invoice_name)
+	siret = data.get("siret", "")
+
+	ethirdparty_name = doc.ethirdparty or frappe.db.get_value("eThirdParty", {"siret": siret}, "name")
+
+	if ethirdparty_name:
+		ethirdparty = frappe.get_doc("eThirdParty", ethirdparty_name)
+	else:
+		ethirdparty = frappe.new_doc("eThirdParty")
+		ethirdparty.party_type = "Supplier"
+		ethirdparty.siret = siret
+
+	ethirdparty.party_name = data.get("party_name", "")
+	ethirdparty.address_line1 = data.get("address_line1", "")
+	ethirdparty.zip = data.get("zip", "")
+	ethirdparty.city = data.get("city", "")
+	ethirdparty.country_code = data.get("country_code", "")
+	ethirdparty.categorie_comptable_tiers = data.get("categorie_comptable_tiers", "")
+	ethirdparty.status = "ready"
+	ethirdparty.save(ignore_permissions=True)
 	frappe.db.commit()
 
-	doc.matched_supplier = supplier.name
-	doc.supplier_match_status = "created"
+	doc.db_set("ethirdparty", ethirdparty.name)
+
+	frappe.db.set_value("ePurchase Invoice", invoice_name, "sirene_status", "ok")
+
+	autres = frappe.get_all(
+		"ePurchase Invoice",
+		filters={
+			"supplier_siret": siret,
+			"name": ["!=", invoice_name],
+			"conversion_status": ["!=", "converted"],
+		},
+		pluck="name",
+	)
+	for autre in autres:
+		frappe.db.set_value(
+			"ePurchase Invoice",
+			autre,
+			{
+				"ethirdparty": ethirdparty.name,
+				"sirene_status": "ok",
+			},
+		)
+	frappe.db.commit()
+	return {"status": "ok", "ethirdparty": ethirdparty.name}
+
+
+@frappe.whitelist()
+def unlink_ethirdparty(name):
+	doc = frappe.get_doc("ePurchase Invoice", name)
+	ethirdparty_name = doc.ethirdparty
+	siret = doc.supplier_siret
+
+	if ethirdparty_name:
+		frappe.db.set_value(
+			"ePurchase Invoice",
+			{"ethirdparty": ethirdparty_name},
+			{
+				"ethirdparty": None,
+				"supplier_match_status": "unmatched",
+				"sirene_status": None,
+			},
+		)
+		frappe.delete_doc("eThirdParty", ethirdparty_name, ignore_permissions=True)
+
+	if siret:
+		frappe.db.set_value(
+			"ePurchase Invoice",
+			{"supplier_siret": siret, "conversion_status": ["!=", "converted"]},
+			{
+				"ethirdparty": None,
+				"supplier_match_status": "unmatched",
+				"sirene_status": None,
+			},
+		)
+
+	frappe.db.commit()
+	return {"status": "ok"}
+
+
+@frappe.whitelist()
+def update_ethirdparty(name, data):
+	if isinstance(data, str):
+		import json
+
+		data = json.loads(data)
+	doc = frappe.get_doc("eThirdParty", name)
+	for field, value in data.items():
+		doc.set(field, value)
+	doc.status = "ready"
 	doc.save(ignore_permissions=True)
 	frappe.db.commit()
-
-	return {"status": "ok", "supplier": supplier.name}
+	return {"status": "ok"}
 
 
 @frappe.whitelist()
@@ -269,6 +444,7 @@ def create_item(name, item_idx, item_name, item_group):
 	new_item.item_group = item_group
 	new_item.item_code = item_name
 	new_item.is_purchase_item = 1
+	new_item.einvoice_source = name
 	new_item.insert(ignore_permissions=True)
 	frappe.db.commit()
 

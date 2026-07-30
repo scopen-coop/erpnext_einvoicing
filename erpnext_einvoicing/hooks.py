@@ -13,7 +13,7 @@ app_license = "gpl-3.0"
 fixtures = [
 	{
 		"dt": "Custom Field",
-		"filters": [["name", "in", ("Purchase Invoice-einvoice_source")]],
+		"filters": [["name", "in", ("Item-einvoice_sourcePurchase Invoice-einvoice_source")]],
 	},
 ]
 

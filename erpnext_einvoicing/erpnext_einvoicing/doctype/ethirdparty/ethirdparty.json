@@ -1,0 +1,177 @@
+{
+ "actions": [],
+ "autoname": "naming_series:",
+ "creation": "2026-07-30 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "party_type",
+  "status",
+  "column_break_header",
+  "siret",
+  "vat_number",
+  "official_data_section",
+  "party_name",
+  "address_line1",
+  "zip",
+  "city",
+  "country_code",
+  "column_break_official",
+  "categorie_comptable_tiers",
+  "matched_party_type",
+  "matched_party",
+  "raw_section",
+  "sirene_raw"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Series",
+   "options": "ETHP-.####",
+   "reqd": 1
+  },
+  {
+   "fieldname": "party_type",
+   "fieldtype": "Select",
+   "label": "Party Type",
+   "options": "Supplier\nCustomer",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "default": "pending",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "pending\nready\nwarning\nnot_found\nconverted",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "column_break_header",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "siret",
+   "fieldtype": "Data",
+   "label": "SIRET",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "vat_number",
+   "fieldtype": "Data",
+   "label": "VAT Number"
+  },
+  {
+   "fieldname": "official_data_section",
+   "fieldtype": "Section Break",
+   "label": "Official Data"
+  },
+  {
+   "fieldname": "party_name",
+   "fieldtype": "Data",
+   "label": "Official Name",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "address_line1",
+   "fieldtype": "Data",
+   "label": "Address"
+  },
+  {
+   "fieldname": "zip",
+   "fieldtype": "Data",
+   "label": "ZIP Code"
+  },
+  {
+   "fieldname": "city",
+   "fieldtype": "Data",
+   "label": "City"
+  },
+  {
+   "fieldname": "country_code",
+   "fieldtype": "Data",
+   "label": "Country Code",
+   "description": "ISO 2-letter code: FR, DE, ES..."
+  },
+  {
+   "fieldname": "column_break_official",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "categorie_comptable_tiers",
+   "fieldtype": "Link",
+   "label": "Categorie Comptable Tiers",
+   "options": "Categorie Comptable Tiers"
+  },
+  {
+   "fieldname": "matched_party_type",
+   "fieldtype": "Link",
+   "label": "Matched Party Type",
+   "options": "DocType",
+   "hidden": 1
+  },
+  {
+   "fieldname": "matched_party",
+   "fieldtype": "Dynamic Link",
+   "label": "Matched Party",
+   "options": "matched_party_type"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "raw_section",
+   "fieldtype": "Section Break",
+   "label": "Raw SIRENE Data"
+  },
+  {
+   "fieldname": "sirene_raw",
+   "fieldtype": "Code",
+   "label": "SIRENE Raw (JSON)",
+   "options": "JSON",
+   "read_only": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-07-30 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "ERPNext eInvoicing",
+ "name": "eThirdParty",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Accounts Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [
+  {"color": "Orange", "title": "pending"},
+  {"color": "Green", "title": "ready"},
+  {"color": "Yellow", "title": "warning"},
+  {"color": "Red", "title": "not_found"},
+  {"color": "Blue", "title": "converted"}
+ ],
+ "title_field": "party_name",
+ "track_changes": 1
+}

@@ -17,9 +17,7 @@ class ePurchaseInvoice(Document):
 		self.conversion_status = "ready" if self._is_ready_for_conversion() else "pending"
 
 	def _is_ready_for_conversion(self) -> bool:
-		if self.supplier_match_status not in ("matched", "created"):
-			return False
-		if not self.matched_supplier:
+		if not self._supplier_ready():
 			return False
 		for item in self.items:
 			if item.match_status not in ("matched", "created"):
@@ -27,6 +25,14 @@ class ePurchaseInvoice(Document):
 			if not item.matched_item:
 				return False
 		return True
+
+	def _supplier_ready(self) -> bool:
+		if self.supplier_match_status == "matched" and self.matched_supplier:
+			return True
+		if self.supplier_match_status in ("ethirdparty", "created") and self.ethirdparty:
+			status = frappe.db.get_value("eThirdParty", self.ethirdparty, "status")
+			return status == "ready"
+		return False
 
 	### Conversion
 

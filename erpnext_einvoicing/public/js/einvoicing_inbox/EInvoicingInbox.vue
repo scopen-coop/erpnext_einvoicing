@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, nextTick } from "vue";
 
 // Helper pour traduction
 function __(text, replace) {
@@ -32,15 +32,23 @@ const counts = computed(() => ({
 
 /*** API ***/
 
-async function fetchInvoices() {
-	loading.value = true;
+async function fetchInvoices(silent = false) {
+	const scrollY = window.scrollY;
+	if (!silent) {
+		loading.value = true;
+	}
 	try {
 		const res = await frappe.call({
 			method: "erpnext_einvoicing.providers.sync.get_einvoicing_inbox",
 		});
 		invoices.value = res.message || [];
 	} finally {
-		loading.value = false;
+		if (!silent) {
+			loading.value = false;
+		} else {
+			await nextTick();
+			window.scrollTo(0, scrollY);
+		}
 	}
 }
 
@@ -54,7 +62,7 @@ async function syncFlows() {
 		const msg = r.message || {};
 		const indicator = msg.status === "ok" ? "green" : "orange";
 		frappe.show_alert({ message: msg.message || __("Sync complete"), indicator }, 5);
-		await fetchInvoices();
+		await fetchInvoices(true);
 	} finally {
 		syncing.value = false;
 	}
@@ -76,7 +84,7 @@ function promptMatchSupplier(invoice) {
 				method: "erpnext_einvoicing.providers.sync.match_supplier",
 				args: { name: invoice.name, matched_supplier: values.matched_supplier },
 			});
-			await fetchInvoices();
+			await fetchInvoices(true);
 		},
 		__("Match Supplier"),
 		__("Confirm")
@@ -91,7 +99,7 @@ function confirmDeleteMatchedSupplier(invoice) {
 				method: "erpnext_einvoicing.providers.sync.unlink_matched_supplier",
 				args: { name: invoice.name },
 			});
-			await fetchInvoices();
+			await fetchInvoices(true);
 		},
 		() => {
 			// action to perform if No is selected
@@ -99,27 +107,165 @@ function confirmDeleteMatchedSupplier(invoice) {
 	);
 }
 
-async function createSupplierFromSiret(invoice) {
+async function enrichFromSiret(invoice) {
 	const r = await frappe.call({
-		method: "erpnext_einvoicing.providers.sync.create_supplier_from_siret",
+		method: "erpnext_einvoicing.providers.sync.enrich_from_siret",
 		args: { name: invoice.name },
 		freeze: true,
 		freeze_message: __("Looking up SIRET..."),
 	});
 	const msg = r.message || {};
-	if (msg.status === "ok") {
-		frappe.show_alert(
-			{ message: __("Supplier created: {0}", [msg.supplier]), indicator: "green" },
-			4
+
+	if (msg.status === "not_found") {
+		frappe.show_alert({ message: __("No company found for this SIRET"), indicator: "red" }, 5);
+		frappe.ui.form.make_quick_entry(
+			"Supplier",
+			async (doc) => {
+				await frappe.call({
+					method: "erpnext_einvoicing.providers.sync.match_supplier",
+					args: { name: invoice.name, matched_supplier: doc.name },
+				});
+				await fetchInvoices(true);
+			},
+			null,
+			{
+				supplier_name: invoice.supplier_name_raw,
+				tax_id: invoice.supplier_siret,
+			}
 		);
-		await fetchInvoices();
-	} else {
-		frappe.msgprint({
-			title: __("Error"),
-			message: msg.error || __("Failed"),
-			indicator: "red",
-		});
+		return;
 	}
+
+	if (msg.status === "error") {
+		frappe.msgprint({ title: __("Error"), message: msg.error, indicator: "red" });
+		return;
+	}
+
+	// ok ou warning → dialog de confirmation
+	const data = msg.data || {};
+	const missingFields = msg.missing_fields || [];
+
+	const d = new frappe.ui.Dialog({
+		title: __("Confirm Supplier Data"),
+		fields: [
+			{
+				fieldname: "party_name",
+				fieldtype: "Data",
+				label: __("Official Name"),
+				default: data.party_name,
+				reqd: 1,
+			},
+			{
+				fieldname: "address_line1",
+				fieldtype: "Data",
+				label: __("Address"),
+				default: data.address_line1,
+			},
+			{ fieldname: "zip", fieldtype: "Data", label: __("ZIP"), default: data.zip },
+			{ fieldname: "city", fieldtype: "Data", label: __("City"), default: data.city },
+			{
+				fieldname: "country_code",
+				fieldtype: "Data",
+				label: __("Country Code"),
+				default: data.country_code,
+			},
+			{
+				fieldname: "categorie_comptable_tiers",
+				fieldtype: "Link",
+				options: "Categorie Comptable Tiers",
+				label: __("Categorie Comptable Tiers"),
+				default: data.categorie_comptable_tiers,
+				reqd: 1,
+			},
+			{ fieldname: "col", fieldtype: "Column Break" },
+			{
+				fieldname: "supplier_group",
+				fieldtype: "Link",
+				options: "Supplier Group",
+				label: __("Supplier Group"),
+				reqd: 1,
+			},
+		],
+		primary_action_label: __("Save"),
+		primary_action: async (values) => {
+			const r2 = await frappe.call({
+				method: "erpnext_einvoicing.providers.sync.save_ethirdparty",
+				args: {
+					invoice_name: invoice.name,
+					data: { ...data, ...values },
+					supplier_group: values.supplier_group,
+				},
+			});
+			if (r2.message?.status === "ok") {
+				frappe.show_alert({ message: __("Supplier data saved"), indicator: "green" }, 4);
+				d.hide();
+				await fetchInvoices(true);
+			}
+		},
+	});
+
+	if (missingFields.length) {
+		d.set_intro(
+			__("Warning: some fields need your attention: {0}", [missingFields.join(", ")]),
+			"orange"
+		);
+	}
+
+	d.show();
+}
+
+function promptEditEThirdParty(invoice, ethirdparty, missingFields) {
+	const d = new frappe.ui.Dialog({
+		title: __("Review eThirdParty Data"),
+		fields: [
+			{
+				fieldname: "party_name",
+				fieldtype: "Data",
+				label: __("Official Name"),
+				default: ethirdparty.party_name,
+				reqd: 1,
+			},
+			{ fieldname: "zip", fieldtype: "Data", label: __("ZIP"), default: ethirdparty.zip },
+			{ fieldname: "city", fieldtype: "Data", label: __("City"), default: ethirdparty.city },
+			{
+				fieldname: "country_code",
+				fieldtype: "Data",
+				label: __("Country Code"),
+				default: ethirdparty.country_code,
+			},
+			{
+				fieldname: "categorie_comptable_tiers",
+				fieldtype: "Link",
+				options: "Categorie Comptable Tiers",
+				label: __("Categorie Comptable Tiers"),
+				default: ethirdparty.categorie_comptable_tiers,
+				reqd: 1,
+			},
+		],
+		primary_action_label: __("Save"),
+		async primary_action(values) {
+			await frappe.call({
+				method: "erpnext_einvoicing.providers.sync.update_ethirdparty",
+				args: { name: ethirdparty.name, data: values },
+			});
+			d.hide();
+			await fetchInvoices(true);
+		},
+	});
+	if (missingFields?.length) {
+		d.set_intro(__("Missing required fields: {0}", [missingFields.join(", ")]), "orange");
+	}
+	d.show();
+}
+
+async function unlinkEThirdParty(invoice) {
+	frappe.confirm(__("Are you sure you want to unlink this eThirdParty?"), async () => {
+		await frappe.call({
+			method: "erpnext_einvoicing.providers.sync.unlink_ethirdparty",
+			args: { name: invoice.name },
+		});
+		await fetchInvoices(true);
+	});
 }
 
 function promptLinkPO(invoice) {
@@ -144,7 +290,7 @@ function promptLinkPO(invoice) {
 				method: "erpnext_einvoicing.providers.sync.link_purchase_order",
 				args: { name: invoice.name, purchase_order: values.purchase_order },
 			});
-			await fetchInvoices();
+			await fetchInvoices(true);
 		},
 		__("Link Purchase Order"),
 		__("Confirm")
@@ -173,7 +319,7 @@ function promptLinkPR(invoice) {
 				method: "erpnext_einvoicing.providers.sync.link_purchase_receipt",
 				args: { name: invoice.name, purchase_receipt: values.purchase_receipt },
 			});
-			await fetchInvoices();
+			await fetchInvoices(true);
 		},
 		__("Link Purchase Receipt"),
 		__("Confirm")
@@ -200,7 +346,7 @@ function promptMatchItem(invoice, item) {
 					matched_item: values.matched_item,
 				},
 			});
-			await fetchInvoices();
+			await fetchInvoices(true);
 		},
 		__("Match Item: {0}", [item.item_description_raw]),
 		__("Confirm")
@@ -218,7 +364,7 @@ function confirmDeleteMatchedItem(invoice, item) {
 					item_idx: item.idx,
 				},
 			});
-			await fetchInvoices();
+			await fetchInvoices(true);
 		},
 		() => {
 			// action to perform if No is selected
@@ -260,7 +406,7 @@ async function createItem(invoice, item) {
 					{ message: __("Item created: {0}", [msg.item]), indicator: "green" },
 					4
 				);
-				await fetchInvoices();
+				await fetchInvoices(true);
 			} else {
 				frappe.msgprint({
 					title: __("Error"),
@@ -301,7 +447,7 @@ async function convertToPI(invoice) {
 				},
 				5
 			);
-			await fetchInvoices();
+			await fetchInvoices(true);
 		}
 	});
 }
@@ -424,7 +570,7 @@ onMounted(async () => {
 								] || 'grey'
 							}`"
 						>
-							{{ invoice.conversion_status }}
+							{{ __(invoice.conversion_status) }}
 						</span>
 					</div>
 					<div
@@ -462,19 +608,34 @@ onMounted(async () => {
 						</span>
 						<span
 							:class="`indicator-pill ${
-								{ unmatched: 'red', matched: 'green', created: 'blue' }[
-									invoice.supplier_match_status
-								] || 'grey'
+								{
+									unmatched: 'red',
+									matched: 'green',
+									ethirdparty: 'orange',
+									created: 'blue',
+								}[invoice.supplier_match_status] || 'grey'
 							}`"
 							style="font-size: 11px"
 						>
-							{{ invoice.supplier_match_status }}
+							{{ __(invoice.supplier_match_status) }}
 						</span>
 
-						<template v-if="invoice.supplier_match_status !== 'unmatched'">
-							<span style="color: #888"
-								><i class="fa fa-arrow-circle-o-right" aria-hidden="true"></i
-							></span>
+						<!-- Badge SIRENE status -->
+						<span
+							v-if="invoice.sirene_status && invoice.sirene_status !== 'not_found'"
+							:class="`indicator-pill ${
+								invoice.sirene_status === 'ok' ? 'green' : 'orange'
+							}`"
+							style="font-size: 11px; cursor: pointer"
+							@click="enrichFromSiret(invoice)"
+							:title="__('Click to review')"
+						>
+							SIRENE {{ invoice.sirene_status === "warning" ? "⚠" : "✓" }}
+						</span>
+
+						<!-- Supplier matched -->
+						<template v-if="invoice.supplier_match_status === 'matched'">
+							<i class="fa fa-link" style="color: green"></i>
 							<a
 								:href="`/app/supplier/${invoice.matched_supplier}`"
 								target="_blank"
@@ -483,13 +644,37 @@ onMounted(async () => {
 							<span
 								@click="confirmDeleteMatchedSupplier(invoice)"
 								style="cursor: pointer"
-								><i
-									class="fa fa-times"
-									style="color: #c11d1d"
-									aria-hidden="true"
-								></i
-							></span>
+							>
+								<i class="fa fa-times" style="color: #c11d1d"></i>
+							</span>
 						</template>
+
+						<!-- eThirdParty -->
+						<template
+							v-else-if="
+								invoice.supplier_match_status === 'ethirdparty' &&
+								invoice.ethirdparty_doc
+							"
+						>
+							<i class="fa fa-user-o" style="color: #6c757d"></i>
+							<span>{{
+								invoice.ethirdparty_doc.party_name || invoice.supplier_name_raw
+							}}</span>
+							<button
+								v-if="invoice.ethirdparty_doc.status === 'warning'"
+								class="btn btn-xs btn-warning"
+								@click="
+									promptEditEThirdParty(invoice, invoice.ethirdparty_doc, [])
+								"
+							>
+								<i class="fa fa-edit"></i> {{ __("Edit") }}
+							</button>
+							<span @click="unlinkEThirdParty(invoice)" style="cursor: pointer">
+								<i class="fa fa-times" style="color: #c11d1d"></i>
+							</span>
+						</template>
+
+						<!-- Unmatched -->
 						<template v-else>
 							<button
 								class="btn btn-xs btn-default"
@@ -500,10 +685,17 @@ onMounted(async () => {
 							<button
 								v-if="invoice.supplier_siret"
 								class="btn btn-xs btn-default"
-								@click="createSupplierFromSiret(invoice)"
+								@click="enrichFromSiret(invoice)"
 							>
 								<i class="fa fa-search"></i> {{ __("SIRENE") }}
 							</button>
+							<span
+								v-if="invoice.sirene_status === 'not_found'"
+								class="indicator-pill red"
+								style="font-size: 11px"
+							>
+								SIRENE ✗
+							</span>
 						</template>
 					</div>
 				</div>
@@ -643,7 +835,7 @@ onMounted(async () => {
 									}`"
 									style="font-size: 11px"
 								>
-									{{ item.match_status }}
+									{{ __(item.match_status) }}
 								</span>
 								<template v-if="item.match_status !== 'unmatched'">
 									<a

@@ -51,7 +51,7 @@ def create_e_purchase_invoice(pdf_content: bytes, flow_data: dict):
 ### XML extraction
 
 
-def _extract_xml_from_pdf(pdf_content: bytes) -> bytes:
+def _extract_xml_from_pdf(pdf_content: bytes):
 	from facturx import get_xml_from_pdf
 
 	try:
@@ -72,7 +72,7 @@ def _extract_xml_from_pdf(pdf_content: bytes) -> bytes:
 ### Format detection
 
 
-def _detect_xml_format(xml_bytes: bytes) -> XmlFormat:
+def _detect_xml_format(xml_bytes: bytes):
 	try:
 		root = etree.fromstring(xml_bytes)
 	except etree.XMLSyntaxError as e:
@@ -94,7 +94,7 @@ def _detect_xml_format(xml_bytes: bytes) -> XmlFormat:
 ### CII Parser
 
 
-def _parse_cii(xml_bytes: bytes) -> dict:
+def _parse_cii(xml_bytes: bytes):
 	root = etree.fromstring(xml_bytes)
 	ns = _CII_NS
 
@@ -243,7 +243,7 @@ def _create_doc(data: dict, xml_bytes: bytes, flow_data: dict):
 	doc.insert(ignore_permissions=True)
 	frappe.db.commit()
 
-	_auto_match_supplier(doc)
+	_auto_match_supplier(doc, data)
 	_auto_match_items(doc)
 
 	return doc
@@ -252,56 +252,75 @@ def _create_doc(data: dict, xml_bytes: bytes, flow_data: dict):
 ### Supplier auto-matching
 
 
-def _auto_match_supplier(doc) -> None:
-	"""Tries to match supplier by SIRET, then by name."""
-	if not doc.supplier_siret and not doc.supplier_name_raw:
-		return
+def _auto_match_supplier(doc, data: dict):
+	"""
+	Priority:
+	1. Existing Supplier by SIRET (tax_id)
+	2. Existing Supplier by name
+	3. Existing eThirdParty by SIRET
+	4. Create eThirdParty in pending
+	"""
+	siret = data.get("supplier_siret", "").replace(" ", "")
+	name_raw = data.get("supplier_name_raw", "")
 
-	supplier = None
+	### 1. Existing Supplier by SIRET
+	if siret:
+		supplier = frappe.db.get_value("Supplier", {"tax_id": siret}, "name")
+		if supplier:
+			doc.db_set("matched_supplier", supplier)
+			doc.db_set("supplier_match_status", "matched")
+			return
 
-	if doc.supplier_siret:
-		supplier = frappe.db.get_value("Supplier", {"tax_id": doc.supplier_siret}, "name")
-
-	if not supplier and doc.supplier_name_raw:
+	### 2. Existing Supplier by name
+	if name_raw:
 		supplier = frappe.db.get_value(
 			"Supplier",
-			{"supplier_name": ["like", f"%{doc.supplier_name_raw}%"]},
+			{"supplier_name": ["like", f"%{name_raw}%"]},
 			"name",
 		)
+		if supplier:
+			doc.db_set("matched_supplier", supplier)
+			doc.db_set("supplier_match_status", "matched")
 
-	if supplier:
-		doc.db_set("matched_supplier", supplier)
-		doc.db_set("supplier_match_status", "matched")
+
+### Items auto-matching
 
 
-def _auto_match_items(doc) -> None:
-	"""Tries to match each item by supplier_part_no, item_code, then item_name."""
+def _auto_match_items(doc):
+	"""
+	Priority:
+	1. Item Supplier.supplier_part_no (with matched supplier)
+	2. Item.item_code exact match on item_ref_raw
+	3. Item.item_name match on item_description_raw
+	"""
+	matched_supplier = doc.matched_supplier
+	updated = False
+
 	for item in doc.items:
 		if item.match_status != "unmatched":
 			continue
 
-		# 1. supplier_part_no on Item Supplier (if supplier match)
-		if item.item_ref_raw and doc.matched_supplier:
+		### 1. supplier_part_no
+		if item.item_ref_raw and matched_supplier:
 			matched = frappe.db.get_value(
 				"Item Supplier",
-				{
-					"supplier": doc.matched_supplier,
-					"supplier_part_no": item.item_ref_raw,
-				},
+				{"supplier": matched_supplier, "supplier_part_no": item.item_ref_raw},
 				"parent",
 			)
 			if matched:
 				item.matched_item = matched
 				item.match_status = "matched"
+				updated = True
 				continue
 
-		# 2. exact item_code
+		### 2. item_code exact
 		if item.item_ref_raw and frappe.db.exists("Item", item.item_ref_raw):
 			item.matched_item = item.item_ref_raw
 			item.match_status = "matched"
+			updated = True
 			continue
 
-		# 3. item_name
+		### 3. item_name
 		if item.item_description_raw:
 			matched = frappe.db.get_value(
 				"Item",
@@ -311,6 +330,11 @@ def _auto_match_items(doc) -> None:
 			if matched:
 				item.matched_item = matched
 				item.match_status = "matched"
+				updated = True
+
+	if updated:
+		doc.save(ignore_permissions=True)
+		frappe.db.commit()
 
 
 ### Helpers
@@ -325,7 +349,7 @@ def _parse_cii_date(date_str: str):
 		return None
 
 
-def _to_float(value) -> float:
+def _to_float(value):
 	try:
 		return float(value)
 	except (ValueError, TypeError):
