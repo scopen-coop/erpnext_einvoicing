@@ -16,6 +16,7 @@ def build_purchase_invoice(epurchase_invoice):
 	pi.due_date = epurchase_invoice.due_date
 	pi.currency = epurchase_invoice.currency or "EUR"
 	pi.buying_price_list = "Standard Buying"
+	pi.einvoice_source = epurchase_invoice.name
 
 	if epurchase_invoice.purchase_order:
 		pi.purchase_order = epurchase_invoice.purchase_order

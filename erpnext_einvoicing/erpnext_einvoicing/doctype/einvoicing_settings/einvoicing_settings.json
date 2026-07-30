@@ -132,6 +132,22 @@
    "fieldname": "auto_sync",
    "fieldtype": "Check",
    "label": "Enable Automatic Synchronisation (every 30 min)"
+  },
+  {
+   "fieldname": "column_break_sync",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "po_required",
+   "fieldtype": "Check",
+   "label": "Purchase Order Required"
+  },
+  {
+   "default": "0",
+   "fieldname": "pr_required",
+   "fieldtype": "Check",
+   "label": "Purchase Receipt Required"
   }
  ],
  "issingle": 1,

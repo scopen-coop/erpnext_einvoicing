@@ -51,7 +51,7 @@
    "fieldname": "flow_type",
    "fieldtype": "Select",
    "label": "Flow Type",
-   "options": "Purchase Invoice\nCustomer Invoice",
+   "options": "Purchase Invoice\nSales Invoice",
    "in_list_view": 1
   },
   {

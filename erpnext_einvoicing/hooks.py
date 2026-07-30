@@ -8,6 +8,15 @@ app_description = "Electronic invoicing (e-Invoicing) module for ERPNext"
 app_email = "contact@scopen.fr"
 app_license = "gpl-3.0"
 
+# Fixtures
+# ---------------
+fixtures = [
+	{
+		"dt": "Custom Field",
+		"filters": [["name", "in", ("Purchase Invoice-einvoice_source")]],
+	},
+]
+
 # Apps
 # ------------------
 
@@ -136,6 +145,7 @@ required_apps = ["frappe", "erpnext"]
 # has_permission = {
 # 	"Event": "frappe.desk.doctype.event.event.has_permission",
 # }
+
 
 # Document Events
 # ---------------

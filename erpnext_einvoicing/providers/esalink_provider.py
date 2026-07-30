@@ -11,7 +11,7 @@ from erpnext_einvoicing.providers.base_provider import BaseProvider
 
 FLOW_TYPE_MAP = {
 	"Purchase Invoice": "SupplierInvoice",
-	"Customer Invoice": "CustomerInvoice",
+	"Sales Invoice": "CustomerInvoice",
 }
 
 PASSWORD_FIELDS = ("client_secret", "api_key", "access_token")
@@ -22,7 +22,7 @@ class EsalinkProvider(BaseProvider):
 
 	### Authentication
 
-	def get_access_token(self) -> str:
+	def get_access_token(self):
 		import base64
 		from urllib.parse import quote
 
@@ -81,10 +81,10 @@ class EsalinkProvider(BaseProvider):
 		self.save_token(token, expires_in=data.get("expires_in"))
 		return token
 
-	def refresh_token(self) -> str:
+	def refresh_token(self):
 		return self.get_access_token()
 
-	def delete_access_token(self) -> bool:
+	def delete_access_token(self):
 		self.settings.db_set("access_token", None)
 		self.settings.db_set("token_expires_at", None)
 		self.settings.access_token = None
@@ -92,7 +92,7 @@ class EsalinkProvider(BaseProvider):
 
 	### Health
 
-	def check_health(self) -> dict:
+	def check_health(self):
 		try:
 			result = self.call_api("healthcheck", "GET")
 		except frappe.ValidationError as e:
@@ -112,7 +112,7 @@ class EsalinkProvider(BaseProvider):
 
 	### Sample invoice
 
-	def send_sample_invoice(self) -> dict:
+	def send_sample_invoice(self):
 		frappe.throw(
 			frappe._("send_sample_invoice is not yet implemented for platform '{0}'.").format(
 				self.platform.provider_name
@@ -128,7 +128,7 @@ class EsalinkProvider(BaseProvider):
 		method: str,
 		params: dict | None = None,
 		extra_headers: dict | None = None,
-	) -> dict:
+	):
 		if self.is_token_expired():
 			self.get_access_token()
 
@@ -158,7 +158,11 @@ class EsalinkProvider(BaseProvider):
 			return {"status_code": 0, "response": "Timeout"}
 
 		content_type = response.headers.get("Content-Type", "")
-		if "application/pdf" in content_type or "application/octet-stream" in content_type:
+		if (
+			"application/pdf" in content_type
+			or "application/octet-stream" in content_type
+			or response.content[:4] == b"%PDF"
+		):
 			return {"status_code": response.status_code, "response": response.content}
 
 		try:
@@ -168,7 +172,7 @@ class EsalinkProvider(BaseProvider):
 
 	### Flows
 
-	def check_pending_flows(self, sync_type: str) -> dict:
+	def check_pending_flows(self, sync_type: str):
 		payload = self._build_search_payload(sync_type, limit=1)
 		result = self.call_api("flows/search", "POST", params=payload)
 		if result["status_code"] not in (200, 202):
@@ -180,7 +184,7 @@ class EsalinkProvider(BaseProvider):
 		total = result["response"].get("total", 0)
 		return {"has_pending": total > 0, "total": total}
 
-	def sync_flows(self, sync_type: str) -> dict:
+	def sync_flows(self, sync_type: str):
 		payload = self._build_search_payload(sync_type, limit=1)
 		result = self.call_api("flows/search", "POST", params=payload)
 		if result["status_code"] not in (200, 202):
@@ -255,8 +259,13 @@ class EsalinkProvider(BaseProvider):
 
 	### Private helpers
 
-	def _process_flow(self, flow_id: str, flow_data: dict, sync_type: str) -> None:
-		result = self.call_api(f"flows/{flow_id}", "GET", params={"docType": "Original"})
+	def _process_flow(self, flow_id: str, flow_data: dict, sync_type: str):
+		result = self.call_api(
+			f"flows/{flow_id}",
+			"GET",
+			params={"docType": "Converted"},
+			extra_headers={"Accept": "application/octet-stream"},
+		)
 		if result["status_code"] not in (200, 202):
 			frappe.throw(
 				frappe._("Failed to download flow {0} (HTTP {1}).").format(flow_id, result["status_code"])
@@ -279,7 +288,7 @@ class EsalinkProvider(BaseProvider):
 		sync_type: str,
 		document_type: str | None,
 		document_name: str | None,
-	) -> None:
+	):
 		doc = frappe.new_doc("eInvoicing Flow")
 		doc.flow_id = flow_id
 		doc.approved_platform = self.platform.name
@@ -300,15 +309,8 @@ class EsalinkProvider(BaseProvider):
 		doc.insert(ignore_permissions=True)
 
 	def _save_sync_log(
-		self,
-		sync_type: str,
-		sync_date,
-		status: str,
-		total: int,
-		synced: int,
-		skipped: int,
-		errors: int,
-	) -> None:
+		self, sync_type: str, sync_date, status: str, total: int, synced: int, skipped: int, errors: int
+	):
 		doc = frappe.new_doc("eInvoicing Sync Log")
 		doc.sync_type = sync_type
 		doc.approved_platform = self.platform.name
@@ -320,7 +322,7 @@ class EsalinkProvider(BaseProvider):
 		doc.flows_error = errors
 		doc.insert(ignore_permissions=True)
 
-	def _build_search_payload(self, sync_type: str, limit: int = 100) -> dict:
+	def _build_search_payload(self, sync_type: str, limit: int = 100):
 		last_sync_date = frappe.db.get_value(
 			"eInvoicing Sync Log",
 			filters={
@@ -345,7 +347,7 @@ class EsalinkProvider(BaseProvider):
 			"limit": limit,
 		}
 
-	def _build_auth_payload(self) -> dict:
+	def _build_auth_payload(self):
 		try:
 			mapping = json.loads(self.platform.auth_payload_map or "{}")
 		except json.JSONDecodeError as e:
@@ -364,7 +366,7 @@ class EsalinkProvider(BaseProvider):
 				payload[api_field] = settings_field
 		return payload
 
-	def _build_api_key_header(self) -> dict:
+	def _build_api_key_header(self):
 		if not self.platform.api_key_header:
 			return {}
 		api_key = self.settings.get_password("api_key") if self.settings.api_key else None

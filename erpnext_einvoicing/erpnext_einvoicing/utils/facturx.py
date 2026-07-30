@@ -244,6 +244,7 @@ def _create_doc(data: dict, xml_bytes: bytes, flow_data: dict):
 	frappe.db.commit()
 
 	_auto_match_supplier(doc)
+	_auto_match_items(doc)
 
 	return doc
 
@@ -271,6 +272,45 @@ def _auto_match_supplier(doc) -> None:
 	if supplier:
 		doc.db_set("matched_supplier", supplier)
 		doc.db_set("supplier_match_status", "matched")
+
+
+def _auto_match_items(doc) -> None:
+	"""Tries to match each item by supplier_part_no, item_code, then item_name."""
+	for item in doc.items:
+		if item.match_status != "unmatched":
+			continue
+
+		# 1. supplier_part_no on Item Supplier (if supplier match)
+		if item.item_ref_raw and doc.matched_supplier:
+			matched = frappe.db.get_value(
+				"Item Supplier",
+				{
+					"supplier": doc.matched_supplier,
+					"supplier_part_no": item.item_ref_raw,
+				},
+				"parent",
+			)
+			if matched:
+				item.matched_item = matched
+				item.match_status = "matched"
+				continue
+
+		# 2. exact item_code
+		if item.item_ref_raw and frappe.db.exists("Item", item.item_ref_raw):
+			item.matched_item = item.item_ref_raw
+			item.match_status = "matched"
+			continue
+
+		# 3. item_name
+		if item.item_description_raw:
+			matched = frappe.db.get_value(
+				"Item",
+				{"item_name": item.item_description_raw, "is_purchase_item": 1},
+				"name",
+			)
+			if matched:
+				item.matched_item = matched
+				item.match_status = "matched"
 
 
 ### Helpers
