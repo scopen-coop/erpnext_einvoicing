@@ -264,6 +264,7 @@ scheduler_events = {
 # export_python_type_annotations = True
 
 after_install = "erpnext_einvoicing.install.after_install"
+after_migrate = "erpnext_einvoicing.migrate.after_migrate"
 
 # Log retention
 # -------------

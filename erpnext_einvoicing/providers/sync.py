@@ -109,6 +109,7 @@ def get_einvoicing_inbox():
 		fields=[
 			"name",
 			"conversion_status",
+			"purchase_invoice",
 			"invoice_number",
 			"invoice_date",
 			"currency",
@@ -176,6 +177,35 @@ def match_supplier(name, matched_supplier):
 	doc.save(ignore_permissions=True)
 	frappe.db.commit()
 	return {"status": "ok"}
+
+
+@frappe.whitelist()
+def rematch_supplier(name):
+	doc = frappe.get_doc("ePurchase Invoice", name)
+	siret = (doc.supplier_siret or "").replace(" ", "")
+	name_raw = doc.supplier_name_raw or ""
+
+	if siret:
+		supplier = frappe.db.get_value("Supplier", {"tax_id": siret}, "name")
+		if supplier:
+			doc.db_set("matched_supplier", supplier)
+			doc.db_set("supplier_match_status", "matched")
+			frappe.db.commit()
+			return {"status": "ok", "supplier": supplier}
+
+	if name_raw:
+		supplier = frappe.db.get_value(
+			"Supplier",
+			{"supplier_name": ["like", f"%{name_raw}%"]},
+			"name",
+		)
+		if supplier:
+			doc.db_set("matched_supplier", supplier)
+			doc.db_set("supplier_match_status", "matched")
+			frappe.db.commit()
+			return {"status": "ok", "supplier": supplier}
+
+	return {"status": "not_found"}
 
 
 @frappe.whitelist()
@@ -457,6 +487,12 @@ def create_item(name, item_idx, item_name, item_group):
 	frappe.db.commit()
 
 	return {"status": "ok", "item": new_item.name}
+
+
+@frappe.whitelist()
+def convert_to_purchase_invoice(name):
+	doc = frappe.get_doc("ePurchase Invoice", name)
+	return doc.convert_to_purchase_invoice()
 
 
 ### Scheduled task

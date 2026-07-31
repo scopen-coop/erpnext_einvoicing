@@ -22,8 +22,8 @@ def _create_esalink_platform():
 	doc.provider_type = "Esalink"
 	doc.is_enabled = 1
 	doc.is_standard = 1
-	doc.prod_api_url = "https://hubtimize.fr/api/orchestrator/"
-	doc.test_api_url = "https://ppd.hubtimize.fr/api/orchestrator/"
+	doc.prod_api_url = "https://hubtimize.fr/api/orchestrator/v1/"
+	doc.test_api_url = "https://ppd.hubtimize.fr/api/orchestrator/v1/"
 	doc.prod_token_url = "https://hubtimize.fr/api/orchestrator/v1/oauth2/token"
 	doc.test_token_url = "https://ppd.hubtimize.fr/api/orchestrator/v1/oauth2/token"
 	doc.auth_type = "OAuth2"

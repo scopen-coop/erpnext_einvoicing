@@ -26,10 +26,10 @@ class ePurchaseInvoice(Document):
 				return False
 		return True
 
-	def _supplier_ready(self) -> bool:
+	def _supplier_ready(self):
 		if self.supplier_match_status == "matched" and self.matched_supplier:
 			return True
-		if self.supplier_match_status in ("ethirdparty", "created") and self.ethirdparty:
+		if self.ethirdparty:
 			status = frappe.db.get_value("eThirdParty", self.ethirdparty, "status")
 			return status == "ready"
 		return False

@@ -91,6 +91,23 @@ function promptMatchSupplier(invoice) {
 	);
 }
 
+async function rematchSupplier(invoice) {
+	const r = await frappe.call({
+		method: "erpnext_einvoicing.providers.sync.rematch_supplier",
+		args: { name: invoice.name },
+	});
+	const msg = r.message || {};
+	if (msg.status === "ok") {
+		frappe.show_alert(
+			{ message: __("Supplier matched: {0}", [msg.supplier]), indicator: "green" },
+			4
+		);
+	} else {
+		frappe.show_alert({ message: __("No supplier found"), indicator: "orange" }, 3);
+	}
+	await fetchInvoices(true);
+}
+
 function confirmDeleteMatchedSupplier(invoice) {
 	frappe.confirm(
 		"Are you sure you want to unlink supplier?",
@@ -430,12 +447,8 @@ function canConvert(invoice) {
 async function convertToPI(invoice) {
 	frappe.confirm(__("Convert {0} to a Purchase Invoice draft?", [invoice.name]), async () => {
 		const r = await frappe.call({
-			method: "frappe.client.run_doc_method",
-			args: {
-				dt: "ePurchase Invoice",
-				dn: invoice.name,
-				method: "convert_to_purchase_invoice",
-			},
+			method: "erpnext_einvoicing.providers.sync.convert_to_purchase_invoice",
+			args: { name: invoice.name },
 			freeze: true,
 			freeze_message: __("Converting..."),
 		});
@@ -678,6 +691,12 @@ onMounted(async () => {
 						<template v-else>
 							<button
 								class="btn btn-xs btn-default"
+								@click="rematchSupplier(invoice)"
+							>
+								<i class="fa fa-refresh"></i> {{ __("Check") }}
+							</button>
+							<button
+								class="btn btn-xs btn-default"
 								@click="promptMatchSupplier(invoice)"
 							>
 								<i class="fa fa-link"></i> {{ __("Match") }}
@@ -900,6 +919,19 @@ onMounted(async () => {
 							? __("Purchase Receipt required")
 							: __("Purchase Order required")
 					}}
+				</div>
+				<div
+					v-if="invoice.conversion_status === 'converted'"
+					style="padding: 10px 16px; border-top: 1px solid #f0f0f0; text-align: right"
+				>
+					<a
+						v-if="invoice.purchase_invoice"
+						:href="`/app/purchase-invoice/${invoice.purchase_invoice}`"
+						target="_blank"
+						class="btn btn-xs btn-default"
+					>
+						<i class="fa fa-file-text-o"></i> {{ invoice.purchase_invoice }}
+					</a>
 				</div>
 			</div>
 		</div>
