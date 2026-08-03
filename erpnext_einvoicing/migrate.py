@@ -13,32 +13,23 @@ def after_migrate():
 
 
 def _create_uom_mappings():
+	frappe.db.sql("DELETE FROM `tabeInvoicing UOM Mapping`")
+
 	mappings = [
-		("C62", "Unit", "Nos"),
+		("C62", "Unit", "Unité"),
+		("PCE", "Piece", "Unité"),
 		("KGM", "Kilogram", "Kg"),
 		("GRM", "Gram", "Gram"),
 		("TNE", "Tonne", "Tonne"),
 		("LTR", "Litre", "Litre"),
-		("MLT", "Millilitre", "mL"),
-		("MTR", "Metre", "Metre"),
-		("CMT", "Centimetre", "Cm"),
-		("MMT", "Millimetre", "mm"),
-		("MTK", "Square metre", "Sq Meter"),
+		("MLT", "Millilitre", "Centilitre"),
+		("MTR", "Metre", "Mètre"),
+		("CMT", "Centimetre", "Centimeter"),
 		("MTQ", "Cubic metre", "Cubic Meter"),
-		("HUR", "Hour", "Hour"),
-		("DAY", "Day", "Day"),
-		("MON", "Month", "Month"),
-		("ANN", "Year", "Year"),
-		("PCE", "Piece", "Nos"),
-		("SET", "Set", "Set"),
-		("PAK", "Pack", "Nos"),
 		("BX", "Box", "Box"),
-		("RL", "Roll", "Roll"),
 	]
 
 	for unece_code, description, erpnext_uom in mappings:
-		if frappe.db.exists("eInvoicing UOM Mapping", unece_code):
-			continue
 		if not frappe.db.exists("UOM", erpnext_uom):
 			continue
 		doc = frappe.new_doc("eInvoicing UOM Mapping")
