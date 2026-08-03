@@ -66,7 +66,9 @@ def check_pending_flows(sync_type="Purchase Invoice"):
 @frappe.whitelist()
 def sync_flows(sync_type="Purchase Invoice"):
 	frappe.only_for("System Manager")
-	return _get_provider().sync_flows(sync_type)
+	r = _get_provider().sync_flows(sync_type)
+	_rematch_all_pending()
+	return r
 
 
 @frappe.whitelist()
@@ -206,6 +208,29 @@ def rematch_supplier(name):
 			return {"status": "ok", "supplier": supplier}
 
 	return {"status": "not_found"}
+
+
+def _rematch_all_pending():
+	invoices = frappe.get_all(
+		"ePurchase Invoice",
+		filters={"conversion_status": ["in", ["pending", "ready"]]},
+		pluck="name",
+	)
+	for name in invoices:
+		doc = frappe.get_doc("ePurchase Invoice", name)
+		if doc.supplier_match_status == "unmatched":
+			from erpnext_einvoicing.erpnext_einvoicing.utils.facturx import _auto_match_supplier
+
+			_auto_match_supplier(
+				doc,
+				{
+					"supplier_siret": doc.supplier_siret,
+					"supplier_name_raw": doc.supplier_name_raw,
+				},
+			)
+		from erpnext_einvoicing.erpnext_einvoicing.utils.facturx import _auto_match_items
+
+		_auto_match_items(doc)
 
 
 @frappe.whitelist()
@@ -451,6 +476,15 @@ def match_item(name, item_idx, matched_item):
 
 
 @frappe.whitelist()
+def rematch_items(name):
+	from erpnext_einvoicing.erpnext_einvoicing.utils.facturx import _auto_match_items
+
+	doc = frappe.get_doc("ePurchase Invoice", name)
+	_auto_match_items(doc)
+	return {"status": "ok"}
+
+
+@frappe.whitelist()
 def unlink_matched_item(name, item_idx):
 	item_idx = int(item_idx)
 	doc = frappe.get_doc("ePurchase Invoice", name)
@@ -493,6 +527,39 @@ def create_item(name, item_idx, item_name, item_group):
 def convert_to_purchase_invoice(name):
 	doc = frappe.get_doc("ePurchase Invoice", name)
 	return doc.convert_to_purchase_invoice()
+
+
+@frappe.whitelist()
+def cancel_conversion(name):
+	doc = frappe.get_doc("ePurchase Invoice", name)
+	if not doc.purchase_invoice:
+		return {"status": "error", "error": frappe._("No Purchase Invoice linked.")}
+
+	pi = frappe.get_doc("Purchase Invoice", doc.purchase_invoice)
+	if pi.docstatus != 0:
+		return {
+			"status": "error",
+			"error": frappe._("Purchase Invoice is already submitted. Cancel it manually first."),
+		}
+
+	pi_name = doc.purchase_invoice
+
+	# Délier d'abord l'ePurchase Invoice
+	frappe.db.set_value(
+		"ePurchase Invoice",
+		name,
+		{
+			"purchase_invoice": None,
+			"conversion_status": "ready",
+		},
+	)
+	frappe.db.set_value("Purchase Invoice", pi_name, "einvoice_source", None)
+	frappe.db.commit()
+
+	frappe.delete_doc("Purchase Invoice", pi_name, ignore_permissions=True)
+	frappe.db.commit()
+
+	return {"status": "ok"}
 
 
 ### Scheduled task

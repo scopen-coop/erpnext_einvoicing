@@ -63,3 +63,34 @@ class ePurchaseInvoice(Document):
 def on_purchase_invoice_submit(doc, method):
 	"""Called on Purchase Invoice submit — placeholder for outgoing flow."""
 	pass
+
+
+def on_purchase_invoice_cancel(doc, method):
+	"""Remet l'ePurchase Invoice en ready quand la PI est annulée."""
+	einvoice = frappe.db.get_value("ePurchase Invoice", {"purchase_invoice": doc.name}, "name")
+	if einvoice:
+		frappe.db.set_value("ePurchase Invoice", einvoice, "conversion_status", "ready")
+		frappe.db.commit()
+		frappe.msgprint(
+			frappe._("ePurchase Invoice {0} has been reset to ready.").format(einvoice),
+			alert=True,
+		)
+
+
+def on_purchase_invoice_trash(doc, method):
+	"""Remet l'ePurchase Invoice en ready quand la PI est supprimée."""
+	einvoice = frappe.db.get_value("ePurchase Invoice", {"purchase_invoice": doc.name}, "name")
+	if einvoice:
+		frappe.db.set_value(
+			"ePurchase Invoice",
+			einvoice,
+			{
+				"purchase_invoice": None,
+				"conversion_status": "ready",
+			},
+		)
+		frappe.db.commit()
+		frappe.msgprint(
+			frappe._("ePurchase Invoice {0} has been reset to ready.").format(einvoice),
+			alert=True,
+		)

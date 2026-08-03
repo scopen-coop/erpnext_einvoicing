@@ -154,6 +154,8 @@ required_apps = ["frappe", "erpnext"]
 doc_events = {
 	"Purchase Invoice": {
 		"on_submit": "erpnext_einvoicing.erpnext_einvoicing.doctype.epurchase_invoice.epurchase_invoice.on_purchase_invoice_submit",
+		"on_cancel": "erpnext_einvoicing.erpnext_einvoicing.doctype.epurchase_invoice.epurchase_invoice.on_purchase_invoice_cancel",
+		"on_trash": "erpnext_einvoicing.erpnext_einvoicing.doctype.epurchase_invoice.epurchase_invoice.on_purchase_invoice_trash",
 	}
 }
 

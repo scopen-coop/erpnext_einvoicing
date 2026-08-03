@@ -370,6 +370,15 @@ function promptMatchItem(invoice, item) {
 	);
 }
 
+async function rematchItems(invoice) {
+	await frappe.call({
+		method: "erpnext_einvoicing.providers.sync.rematch_items",
+		args: { name: invoice.name },
+	});
+	frappe.show_alert({ message: __("Items re-matched"), indicator: "green" }, 3);
+	await fetchInvoices(true);
+}
+
 function confirmDeleteMatchedItem(invoice, item) {
 	frappe.confirm(
 		"Are you sure you want to unlink item?",
@@ -463,6 +472,25 @@ async function convertToPI(invoice) {
 			await fetchInvoices(true);
 		}
 	});
+}
+
+async function cancelConversion(invoice) {
+	frappe.confirm(
+		__("Delete the linked Purchase Invoice draft and reset this invoice?"),
+		async () => {
+			const r = await frappe.call({
+				method: "erpnext_einvoicing.providers.sync.cancel_conversion",
+				args: { name: invoice.name },
+			});
+			const msg = r.message || {};
+			if (msg.status === "ok") {
+				frappe.show_alert({ message: __("Conversion cancelled"), indicator: "green" }, 3);
+			} else {
+				frappe.msgprint({ message: msg.error, indicator: "red" });
+			}
+			await fetchInvoices(true);
+		}
+	);
 }
 
 /*** UI helpers ***/
@@ -663,12 +691,7 @@ onMounted(async () => {
 						</template>
 
 						<!-- eThirdParty -->
-						<template
-							v-else-if="
-								invoice.supplier_match_status === 'ethirdparty' &&
-								invoice.ethirdparty_doc
-							"
-						>
+						<template v-else-if="invoice.ethirdparty_doc">
 							<i class="fa fa-user-o" style="color: #6c757d"></i>
 							<span>{{
 								invoice.ethirdparty_doc.party_name || invoice.supplier_name_raw
@@ -877,6 +900,12 @@ onMounted(async () => {
 								<template v-else>
 									<button
 										class="btn btn-xs btn-default"
+										@click="rematchItems(invoice)"
+									>
+										<i class="fa fa-refresh"></i>
+									</button>
+									<button
+										class="btn btn-xs btn-default"
 										@click="promptMatchItem(invoice, item)"
 									>
 										<i class="fa fa-link"></i> {{ __("Match") }}
@@ -932,6 +961,9 @@ onMounted(async () => {
 					>
 						<i class="fa fa-file-text-o"></i> {{ invoice.purchase_invoice }}
 					</a>
+					<button class="btn btn-xs btn-danger ml-1" @click="cancelConversion(invoice)">
+						<i class="fa fa-undo"></i> {{ __("Reset") }}
+					</button>
 				</div>
 			</div>
 		</div>
