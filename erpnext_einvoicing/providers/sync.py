@@ -66,9 +66,7 @@ def check_pending_flows(sync_type="Purchase Invoice"):
 @frappe.whitelist()
 def sync_flows(sync_type="Purchase Invoice"):
 	frappe.only_for("System Manager")
-	r = _get_provider().sync_flows(sync_type)
-	_rematch_all_pending()
-	return r
+	return _get_provider().sync_flows(sync_type)
 
 
 @frappe.whitelist()
@@ -172,13 +170,123 @@ def get_einvoicing_inbox():
 
 
 @frappe.whitelist()
-def match_supplier(name, matched_supplier):
+def match_supplier(name, matched_supplier, apply_to_all=0):
+	apply_to_all = frappe.utils.cint(apply_to_all)
+
+	frappe.db.set_value(
+		"ePurchase Invoice",
+		name,
+		{
+			"matched_supplier": matched_supplier,
+			"supplier_match_status": "matched",
+		},
+	)
+
+	# Recalculer le statut de cette invoice
 	doc = frappe.get_doc("ePurchase Invoice", name)
-	doc.matched_supplier = matched_supplier
-	doc.supplier_match_status = "matched"
-	doc.save(ignore_permissions=True)
+	doc._update_conversion_status()
+	doc.db_set("conversion_status", doc.conversion_status)
+
+	if apply_to_all:
+		siret = frappe.db.get_value("ePurchase Invoice", name, "supplier_siret")
+		if siret:
+			others = frappe.get_all(
+				"ePurchase Invoice",
+				filters={
+					"supplier_siret": siret,
+					"name": ["!=", name],
+					"supplier_match_status": "unmatched",
+					"conversion_status": ["!=", "converted"],
+				},
+				pluck="name",
+			)
+			for other in others:
+				frappe.db.set_value(
+					"ePurchase Invoice",
+					other,
+					{
+						"matched_supplier": matched_supplier,
+						"supplier_match_status": "matched",
+					},
+				)
+				inv = frappe.get_doc("ePurchase Invoice", other)
+				inv._update_conversion_status()
+				inv.db_set("conversion_status", inv.conversion_status)
+
 	frappe.db.commit()
 	return {"status": "ok"}
+
+
+@frappe.whitelist()
+def count_similar_unmatched(name, match_type):
+	doc = frappe.get_doc("ePurchase Invoice", name)
+
+	if match_type == "supplier":
+		if not doc.supplier_siret:
+			return {"count": 0}
+		count = frappe.db.count(
+			"ePurchase Invoice",
+			{
+				"supplier_siret": doc.supplier_siret,
+				"name": ["!=", name],
+				"supplier_match_status": "unmatched",
+				"conversion_status": ["!=", "converted"],
+			},
+		)
+		return {"count": count}
+
+	if match_type == "item":
+		item_idx = frappe.form_dict.get("item_idx")
+		if not item_idx:
+			return {"count": 0}
+		doc = frappe.get_doc("ePurchase Invoice", name)
+		ref_raw = next((i.item_ref_raw for i in doc.items if i.idx == int(item_idx)), None)
+		if not ref_raw:
+			return {"count": 0}
+		count = frappe.db.count(
+			"ePurchase Invoice Item",
+			{
+				"item_ref_raw": ref_raw,
+				"match_status": "unmatched",
+				"parent": ["!=", name],
+			},
+		)
+		return {"count": count}
+
+	if match_type == "supplier_matched":
+		siret = frappe.db.get_value("ePurchase Invoice", name, "supplier_siret")
+		if not siret:
+			return {"count": 0}
+		count = frappe.db.count(
+			"ePurchase Invoice",
+			{
+				"supplier_siret": siret,
+				"name": ["!=", name],
+				"supplier_match_status": "matched",
+				"conversion_status": ["!=", "converted"],
+			},
+		)
+		return {"count": count}
+
+	if match_type == "item_matched":
+		item_idx = frappe.form_dict.get("item_idx")
+		if not item_idx:
+			return {"count": 0}
+		doc = frappe.get_doc("ePurchase Invoice", name)
+		ref_raw = next((i.item_ref_raw for i in doc.items if i.idx == int(item_idx)), None)
+		if not ref_raw:
+			return {"count": 0}
+		count = frappe.db.count(
+			"ePurchase Invoice Item",
+			{
+				"item_ref_raw": ref_raw,
+				"match_status": "matched",
+				"parent": ["!=", name],
+			},
+		)
+		return {"count": count}
+
+	return {"count": 0}
 
 
 @frappe.whitelist()
@@ -234,11 +342,11 @@ def _rematch_all_pending():
 
 
 @frappe.whitelist()
-def unlink_matched_supplier(name):
+def unlink_matched_supplier(name, apply_to_all=0):
+	apply_to_all = frappe.utils.cint(apply_to_all)
 	doc = frappe.get_doc("ePurchase Invoice", name)
-	doc.matched_supplier = None
-	doc.supplier_match_status = "unmatched"
-	doc.save(ignore_permissions=True)
+	siret = doc.supplier_siret
+	ethirdparty_name = doc.ethirdparty
 
 	frappe.db.set_value(
 		"ePurchase Invoice",
@@ -248,11 +356,27 @@ def unlink_matched_supplier(name):
 			"supplier_match_status": "unmatched",
 			"ethirdparty": None,
 			"sirene_status": None,
+			"conversion_status": "pending",
 		},
 	)
-	ethirdparty_name = doc.ethirdparty
+
+	if apply_to_all and siret:
+		frappe.db.set_value(
+			"ePurchase Invoice",
+			{"supplier_siret": siret, "name": ["!=", name], "conversion_status": ["!=", "converted"]},
+			{
+				"matched_supplier": None,
+				"supplier_match_status": "unmatched",
+				"ethirdparty": None,
+				"sirene_status": None,
+				"conversion_status": "pending",
+			},
+		)
+
 	if ethirdparty_name:
-		frappe.delete_doc("eThirdParty", ethirdparty_name, ignore_permissions=True)
+		others = frappe.db.count("ePurchase Invoice", {"ethirdparty": ethirdparty_name})
+		if not others:
+			frappe.delete_doc("eThirdParty", ethirdparty_name, ignore_permissions=True)
 
 	frappe.db.commit()
 	return {"status": "ok"}
@@ -359,7 +483,8 @@ def enrich_from_siret(name):
 
 
 @frappe.whitelist()
-def save_ethirdparty(invoice_name, data, supplier_group):
+def save_ethirdparty(invoice_name, data, supplier_group, apply_to_all=0):
+	apply_to_all = frappe.utils.cint(apply_to_all)
 	if isinstance(data, str):
 		import json
 
@@ -388,33 +513,35 @@ def save_ethirdparty(invoice_name, data, supplier_group):
 	frappe.db.commit()
 
 	doc.db_set("ethirdparty", ethirdparty.name)
-
 	frappe.db.set_value("ePurchase Invoice", invoice_name, "sirene_status", "ok")
 
-	autres = frappe.get_all(
-		"ePurchase Invoice",
-		filters={
-			"supplier_siret": siret,
-			"name": ["!=", invoice_name],
-			"conversion_status": ["!=", "converted"],
-		},
-		pluck="name",
-	)
-	for autre in autres:
-		frappe.db.set_value(
+	if apply_to_all and siret:
+		others = frappe.get_all(
 			"ePurchase Invoice",
-			autre,
-			{
-				"ethirdparty": ethirdparty.name,
-				"sirene_status": "ok",
+			filters={
+				"supplier_siret": siret,
+				"name": ["!=", invoice_name],
+				"conversion_status": ["!=", "converted"],
 			},
+			pluck="name",
 		)
+		for other in others:
+			frappe.db.set_value(
+				"ePurchase Invoice",
+				other,
+				{
+					"ethirdparty": ethirdparty.name,
+					"sirene_status": "ok",
+				},
+			)
+
 	frappe.db.commit()
 	return {"status": "ok", "ethirdparty": ethirdparty.name}
 
 
 @frappe.whitelist()
-def unlink_ethirdparty(name):
+def unlink_ethirdparty(name, apply_to_all=0):
+	apply_to_all = frappe.utils.cint(apply_to_all)
 	doc = frappe.get_doc("ePurchase Invoice", name)
 	ethirdparty_name = doc.ethirdparty
 	siret = doc.supplier_siret
@@ -423,23 +550,15 @@ def unlink_ethirdparty(name):
 		frappe.db.set_value(
 			"ePurchase Invoice",
 			{"ethirdparty": ethirdparty_name},
-			{
-				"ethirdparty": None,
-				"supplier_match_status": "unmatched",
-				"sirene_status": None,
-			},
+			{"ethirdparty": None, "supplier_match_status": "unmatched", "sirene_status": None},
 		)
 		frappe.delete_doc("eThirdParty", ethirdparty_name, ignore_permissions=True)
 
-	if siret:
+	if apply_to_all and siret:
 		frappe.db.set_value(
 			"ePurchase Invoice",
 			{"supplier_siret": siret, "conversion_status": ["!=", "converted"]},
-			{
-				"ethirdparty": None,
-				"supplier_match_status": "unmatched",
-				"sirene_status": None,
-			},
+			{"ethirdparty": None, "supplier_match_status": "unmatched", "sirene_status": None},
 		)
 
 	frappe.db.commit()
@@ -462,17 +581,52 @@ def update_ethirdparty(name, data):
 
 
 @frappe.whitelist()
-def match_item(name, item_idx, matched_item):
+def match_item(name, item_idx, matched_item, apply_to_all=0):
+	apply_to_all = frappe.utils.cint(apply_to_all)
 	item_idx = int(item_idx)
 	doc = frappe.get_doc("ePurchase Invoice", name)
+
+	ref_raw = None
 	for item in doc.items:
 		if item.idx == item_idx:
 			item.matched_item = matched_item
 			item.match_status = "matched"
+			ref_raw = item.item_ref_raw
 			break
+
+	# Matcher les autres items avec la même ref dans la meme Invoice
+	if ref_raw:
+		for item in doc.items:
+			if item.item_ref_raw == ref_raw and item.match_status == "unmatched":
+				item.matched_item = matched_item
+				item.match_status = "matched"
+
 	doc.save(ignore_permissions=True)
+
+	if apply_to_all and ref_raw:
+		_apply_item_match_to_all(name, ref_raw, matched_item)
+
 	frappe.db.commit()
 	return {"status": "ok"}
+
+
+def _apply_item_match_to_all(exclude_name, item_ref_raw, matched_item):
+	"""Applique le match item à toutes les lignes avec la même référence fournisseur."""
+	invoices = frappe.get_all(
+		"ePurchase Invoice",
+		filters={"name": ["!=", exclude_name], "conversion_status": ["!=", "converted"]},
+		pluck="name",
+	)
+	for inv_name in invoices:
+		inv = frappe.get_doc("ePurchase Invoice", inv_name)
+		updated = False
+		for item in inv.items:
+			if item.item_ref_raw == item_ref_raw and item.match_status == "unmatched":
+				item.matched_item = matched_item
+				item.match_status = "matched"
+				updated = True
+		if updated:
+			inv.save(ignore_permissions=True)
 
 
 @frappe.whitelist()
@@ -485,15 +639,44 @@ def rematch_items(name):
 
 
 @frappe.whitelist()
-def unlink_matched_item(name, item_idx):
+def unlink_matched_item(name, item_idx, apply_to_all=0):
+	apply_to_all = frappe.utils.cint(apply_to_all)
 	item_idx = int(item_idx)
 	doc = frappe.get_doc("ePurchase Invoice", name)
+
+	ref_raw = None
 	for item in doc.items:
 		if item.idx == item_idx:
+			ref_raw = item.item_ref_raw
 			item.matched_item = None
 			item.match_status = "unmatched"
 			break
+
 	doc.save(ignore_permissions=True)
+	doc.reload()
+	doc._update_conversion_status()
+	doc.db_set("conversion_status", doc.conversion_status)
+
+	if apply_to_all and ref_raw:
+		invoices = frappe.get_all(
+			"ePurchase Invoice",
+			filters={"name": ["!=", name], "conversion_status": ["!=", "converted"]},
+			pluck="name",
+		)
+		for inv_name in invoices:
+			inv = frappe.get_doc("ePurchase Invoice", inv_name)
+			updated = False
+			for item in inv.items:
+				if item.item_ref_raw == ref_raw and item.match_status == "matched":
+					item.matched_item = None
+					item.match_status = "unmatched"
+					updated = True
+			if updated:
+				inv.save(ignore_permissions=True)
+				inv.reload()
+				inv._update_conversion_status()
+				inv.db_set("conversion_status", inv.conversion_status)
+
 	frappe.db.commit()
 	return {"status": "ok"}
 

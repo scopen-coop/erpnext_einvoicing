@@ -80,11 +80,36 @@ function promptMatchSupplier(invoice) {
 			},
 		],
 		async (values) => {
-			await frappe.call({
-				method: "erpnext_einvoicing.providers.sync.match_supplier",
-				args: { name: invoice.name, matched_supplier: values.matched_supplier },
+			// Compter les autres factures avec le même SIRET
+			const siblings = await frappe.call({
+				method: "erpnext_einvoicing.providers.sync.count_similar_unmatched",
+				args: { name: invoice.name, match_type: "supplier" },
 			});
-			await fetchInvoices(true);
+			const count = siblings.message?.count || 0;
+
+			const doMatch = async (apply_to_all) => {
+				await frappe.call({
+					method: "erpnext_einvoicing.providers.sync.match_supplier",
+					args: {
+						name: invoice.name,
+						matched_supplier: values.matched_supplier,
+						apply_to_all,
+					},
+				});
+				await fetchInvoices(true);
+			};
+
+			if (count > 0) {
+				frappe.confirm(
+					__("Apply this supplier to {0} other invoice(s) with the same SIRET?", [
+						count,
+					]),
+					() => doMatch(1),
+					() => doMatch(0)
+				);
+			} else {
+				await doMatch(0);
+			}
 		},
 		__("Match Supplier"),
 		__("Confirm")
@@ -108,20 +133,30 @@ async function rematchSupplier(invoice) {
 	await fetchInvoices(true);
 }
 
-function confirmDeleteMatchedSupplier(invoice) {
-	frappe.confirm(
-		"Are you sure you want to unlink supplier?",
-		async () => {
-			await frappe.call({
-				method: "erpnext_einvoicing.providers.sync.unlink_matched_supplier",
-				args: { name: invoice.name },
-			});
-			await fetchInvoices(true);
-		},
-		() => {
-			// action to perform if No is selected
-		}
-	);
+async function confirmDeleteMatchedSupplier(invoice) {
+	const siblings = await frappe.call({
+		method: "erpnext_einvoicing.providers.sync.count_similar_unmatched",
+		args: { name: invoice.name, match_type: "supplier_matched" },
+	});
+	const count = siblings.message?.count || 0;
+
+	const doUnlink = async (apply_to_all) => {
+		await frappe.call({
+			method: "erpnext_einvoicing.providers.sync.unlink_matched_supplier",
+			args: { name: invoice.name, apply_to_all },
+		});
+		await fetchInvoices(true);
+	};
+
+	if (count > 0) {
+		frappe.confirm(
+			__("Unlink this supplier from {0} other invoice(s) with the same SIRET?", [count]),
+			() => doUnlink(1),
+			() => doUnlink(0)
+		);
+	} else {
+		await doUnlink(0);
+	}
 }
 
 async function enrichFromSiret(invoice) {
@@ -205,18 +240,42 @@ async function enrichFromSiret(invoice) {
 		],
 		primary_action_label: __("Save"),
 		primary_action: async (values) => {
-			const r2 = await frappe.call({
-				method: "erpnext_einvoicing.providers.sync.save_ethirdparty",
-				args: {
-					invoice_name: invoice.name,
-					data: { ...data, ...values },
-					supplier_group: values.supplier_group,
-				},
+			const siblings = await frappe.call({
+				method: "erpnext_einvoicing.providers.sync.count_similar_unmatched",
+				args: { name: invoice.name, match_type: "supplier" },
 			});
-			if (r2.message?.status === "ok") {
-				frappe.show_alert({ message: __("Supplier data saved"), indicator: "green" }, 4);
-				d.hide();
-				await fetchInvoices(true);
+			const count = siblings.message?.count || 0;
+
+			const doSave = async (apply_to_all) => {
+				const r2 = await frappe.call({
+					method: "erpnext_einvoicing.providers.sync.save_ethirdparty",
+					args: {
+						invoice_name: invoice.name,
+						data: { ...data, ...values },
+						supplier_group: values.supplier_group,
+						apply_to_all,
+					},
+				});
+				if (r2.message?.status === "ok") {
+					frappe.show_alert(
+						{ message: __("Supplier data saved"), indicator: "green" },
+						4
+					);
+					d.hide();
+					await fetchInvoices(true);
+				}
+			};
+
+			if (count > 0) {
+				frappe.confirm(
+					__("Apply this supplier to {0} other invoice(s) with the same SIRET?", [
+						count,
+					]),
+					() => doSave(1),
+					() => doSave(0)
+				);
+			} else {
+				await doSave(0);
 			}
 		},
 	});
@@ -276,13 +335,29 @@ function promptEditEThirdParty(invoice, ethirdparty, missingFields) {
 }
 
 async function unlinkEThirdParty(invoice) {
-	frappe.confirm(__("Are you sure you want to unlink this eThirdParty?"), async () => {
+	const siblings = await frappe.call({
+		method: "erpnext_einvoicing.providers.sync.count_similar_unmatched",
+		args: { name: invoice.name, match_type: "supplier_matched" },
+	});
+	const count = siblings.message?.count || 0;
+
+	const doUnlink = async (apply_to_all) => {
 		await frappe.call({
 			method: "erpnext_einvoicing.providers.sync.unlink_ethirdparty",
-			args: { name: invoice.name },
+			args: { name: invoice.name, apply_to_all },
 		});
 		await fetchInvoices(true);
-	});
+	};
+
+	if (count > 0) {
+		frappe.confirm(
+			__("Unlink this eThirdParty from {0} other invoice(s) with the same SIRET?", [count]),
+			() => doUnlink(1),
+			() => doUnlink(0)
+		);
+	} else {
+		await doUnlink(0);
+	}
 }
 
 function promptLinkPO(invoice) {
@@ -355,15 +430,36 @@ function promptMatchItem(invoice, item) {
 			},
 		],
 		async (values) => {
-			await frappe.call({
-				method: "erpnext_einvoicing.providers.sync.match_item",
-				args: {
-					name: invoice.name,
-					item_idx: item.idx,
-					matched_item: values.matched_item,
-				},
+			const siblings = await frappe.call({
+				method: "erpnext_einvoicing.providers.sync.count_similar_unmatched",
+				args: { name: invoice.name, match_type: "item", item_idx: item.idx },
 			});
-			await fetchInvoices(true);
+			const count = siblings.message?.count || 0;
+
+			const doMatch = async (apply_to_all) => {
+				await frappe.call({
+					method: "erpnext_einvoicing.providers.sync.match_item",
+					args: {
+						name: invoice.name,
+						item_idx: item.idx,
+						matched_item: values.matched_item,
+						apply_to_all,
+					},
+				});
+				await fetchInvoices(true);
+			};
+
+			if (count > 0) {
+				frappe.confirm(
+					__("Apply this item to {0} other line(s) with the same supplier reference?", [
+						count,
+					]),
+					() => doMatch(1),
+					() => doMatch(0)
+				);
+			} else {
+				await doMatch(0);
+			}
 		},
 		__("Match Item: {0}", [item.item_description_raw]),
 		__("Confirm")
@@ -379,23 +475,32 @@ async function rematchItems(invoice) {
 	await fetchInvoices(true);
 }
 
-function confirmDeleteMatchedItem(invoice, item) {
-	frappe.confirm(
-		"Are you sure you want to unlink item?",
-		async () => {
-			await frappe.call({
-				method: "erpnext_einvoicing.providers.sync.unlink_matched_item",
-				args: {
-					name: invoice.name,
-					item_idx: item.idx,
-				},
-			});
-			await fetchInvoices(true);
-		},
-		() => {
-			// action to perform if No is selected
-		}
-	);
+async function confirmDeleteMatchedItem(invoice, item) {
+	const siblings = await frappe.call({
+		method: "erpnext_einvoicing.providers.sync.count_similar_unmatched",
+		args: { name: invoice.name, match_type: "item_matched", item_idx: item.idx },
+	});
+	const count = siblings.message?.count || 0;
+
+	const doUnlink = async (apply_to_all) => {
+		await frappe.call({
+			method: "erpnext_einvoicing.providers.sync.unlink_matched_item",
+			args: { name: invoice.name, item_idx: item.idx, apply_to_all },
+		});
+		await fetchInvoices(true);
+	};
+
+	if (count > 0) {
+		frappe.confirm(
+			__("Unlink this item from {0} other line(s) with the same supplier reference?", [
+				count,
+			]),
+			() => doUnlink(1),
+			() => doUnlink(0)
+		);
+	} else {
+		await doUnlink(0);
+	}
 }
 
 async function createItem(invoice, item) {
