@@ -594,14 +594,16 @@ def match_item(name, item_idx, matched_item, apply_to_all=0):
 			ref_raw = item.item_ref_raw
 			break
 
-	# Matcher les autres items avec la même ref dans la meme Invoice
-	if ref_raw:
+	if apply_to_all and ref_raw:
 		for item in doc.items:
 			if item.item_ref_raw == ref_raw and item.match_status == "unmatched":
 				item.matched_item = matched_item
 				item.match_status = "matched"
 
 	doc.save(ignore_permissions=True)
+	doc.reload()
+	doc._update_conversion_status()
+	doc.db_set("conversion_status", doc.conversion_status)
 
 	if apply_to_all and ref_raw:
 		_apply_item_match_to_all(name, ref_raw, matched_item)
@@ -651,6 +653,12 @@ def unlink_matched_item(name, item_idx, apply_to_all=0):
 			item.matched_item = None
 			item.match_status = "unmatched"
 			break
+
+	if apply_to_all and ref_raw:
+		for item in doc.items:
+			if item.item_ref_raw == ref_raw and item.match_status == "matched":
+				item.matched_item = None
+				item.match_status = "unmatched"
 
 	doc.save(ignore_permissions=True)
 	doc.reload()
