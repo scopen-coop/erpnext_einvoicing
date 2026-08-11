@@ -75,6 +75,31 @@ def build_purchase_invoice(epurchase_invoice):
 			is_private=1,
 		)
 
+	for item in epurchase_invoice.items:
+		if not item.matched_item or not item.item_ref_raw:
+			continue
+		supplier_name = pi.supplier
+
+		existing = frappe.db.get_value(
+			"Item Supplier",
+			{
+				"parent": item.matched_item,
+				"supplier": supplier_name,
+			},
+			"name",
+		)
+
+		if not existing:
+			item_doc = frappe.get_doc("Item", item.matched_item)
+			item_doc.append(
+				"supplier_items",
+				{
+					"supplier": supplier_name,
+					"supplier_part_no": item.item_ref_raw,
+				},
+			)
+			item_doc.save(ignore_permissions=True)
+
 	frappe.db.commit()
 
 	return pi
