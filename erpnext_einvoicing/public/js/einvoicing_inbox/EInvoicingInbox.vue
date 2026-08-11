@@ -109,7 +109,7 @@ function promptMatchSupplier(invoice) {
 			const count = siblings.message?.count || 0;
 
 			const doMatch = async (apply_to_all) => {
-				await frappe.call({
+				const r = await frappe.call({
 					method: "erpnext_einvoicing.providers.sync.match_supplier",
 					args: {
 						name: invoice.name,
@@ -117,6 +117,17 @@ function promptMatchSupplier(invoice) {
 						apply_to_all,
 					},
 				});
+				const msg = r.message || {};
+				let message = __("Supplier matched: {0}", [values.matched_supplier]);
+				if (msg.matched_items > 0) {
+					message +=
+						" - " +
+						__("{0}/{1} item(s) matched", [msg.matched_items, msg.total_items]);
+				}
+				if (msg.conversion_status === "ready") {
+					message += " - " + __("Invoice is ready to convert");
+				}
+				frappe.show_alert({ message, indicator: "green" }, 10);
 				await fetchInvoices(true);
 			};
 
@@ -144,10 +155,14 @@ async function rematchSupplier(invoice) {
 	});
 	const msg = r.message || {};
 	if (msg.status === "ok") {
-		frappe.show_alert(
-			{ message: __("Supplier matched: {0}", [msg.supplier]), indicator: "green" },
-			4
-		);
+		let message = __("Supplier matched: {0}", [msg.supplier]);
+		if (msg.matched_items > 0) {
+			message += " - " + __("{0}/{1} item(s) matched", [msg.matched_items, msg.total_items]);
+		}
+		if (msg.conversion_status === "ready") {
+			message += " - " + __("Invoice is ready to convert");
+		}
+		frappe.show_alert({ message, indicator: "green" }, 10);
 	} else {
 		frappe.show_alert({ message: __("No supplier found"), indicator: "orange" }, 3);
 	}
@@ -448,6 +463,9 @@ function promptMatchItem(invoice, item) {
 				options: "Item",
 				label: __("Select Item"),
 				reqd: 1,
+				get_query: () => ({
+					filters: { is_purchase_item: 1 },
+				}),
 			},
 		],
 		async (values) => {

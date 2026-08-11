@@ -186,7 +186,10 @@ def match_supplier(name, matched_supplier, apply_to_all=0):
 	)
 
 	# Recalculer le statut de cette invoice
+	from erpnext_einvoicing.erpnext_einvoicing.utils.facturx import _auto_match_items
+
 	doc = frappe.get_doc("ePurchase Invoice", name)
+	_auto_match_items(doc)
 	doc._update_conversion_status()
 	doc.db_set("conversion_status", doc.conversion_status)
 
@@ -217,7 +220,14 @@ def match_supplier(name, matched_supplier, apply_to_all=0):
 				inv.db_set("conversion_status", inv.conversion_status)
 
 	frappe.db.commit()
-	return {"status": "ok"}
+	matched_count = sum(1 for item in doc.items if item.match_status == "matched")
+	return {
+		"status": "ok",
+		"supplier": matched_supplier,
+		"matched_items": matched_count,
+		"total_items": len(doc.items),
+		"conversion_status": doc.conversion_status,
+	}
 
 
 @frappe.whitelist()
@@ -518,6 +528,10 @@ def save_ethirdparty(invoice_name, data, supplier_group, apply_to_all=0):
 	doc.db_set("ethirdparty", ethirdparty.name)
 	frappe.db.set_value("ePurchase Invoice", invoice_name, "sirene_status", "ok")
 
+	from erpnext_einvoicing.erpnext_einvoicing.utils.facturx import _auto_match_items
+
+	_auto_match_items(doc)
+
 	if apply_to_all and siret:
 		others = frappe.get_all(
 			"ePurchase Invoice",
@@ -539,7 +553,16 @@ def save_ethirdparty(invoice_name, data, supplier_group, apply_to_all=0):
 			)
 
 	frappe.db.commit()
-	return {"status": "ok", "ethirdparty": ethirdparty.name}
+	doc.reload()
+	matched_count = sum(1 for item in doc.items if item.match_status == "matched")
+	return {
+		"status": "ok",
+		"supplier": ethirdparty.party_name,
+		"matched_items": matched_count,
+		"total_items": len(doc.items),
+		"conversion_status": doc.conversion_status,
+		"ethirdparty": ethirdparty.name,
+	}
 
 
 @frappe.whitelist()
