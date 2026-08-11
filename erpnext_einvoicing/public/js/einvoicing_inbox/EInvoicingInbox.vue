@@ -118,6 +118,14 @@ function promptMatchSupplier(invoice) {
 					},
 				});
 				const msg = r.message || {};
+				if (msg.status === "warning") {
+					frappe.msgprint({
+						message: msg.message,
+						indicator: "orange",
+						title: __("Warning"),
+					});
+					return;
+				}
 				let message = __("Supplier matched: {0}", [values.matched_supplier]);
 				if (msg.matched_items > 0) {
 					message +=
@@ -154,6 +162,10 @@ async function rematchSupplier(invoice) {
 		args: { name: invoice.name },
 	});
 	const msg = r.message || {};
+	if (msg.status === "warning") {
+		frappe.msgprint({ message: msg.message, indicator: "orange", title: __("Warning") });
+		return;
+	}
 	if (msg.status === "ok") {
 		let message = __("Supplier matched: {0}", [msg.supplier]);
 		if (msg.matched_items > 0) {

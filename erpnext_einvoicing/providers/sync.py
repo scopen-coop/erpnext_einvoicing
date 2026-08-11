@@ -205,6 +205,31 @@ def get_einvoicing_inbox():
 def match_supplier(name, matched_supplier, apply_to_all=0):
 	apply_to_all = frappe.utils.cint(apply_to_all)
 
+	### Vérification cohérence SIRET
+	siret = frappe.db.get_value("ePurchase Invoice", name, "supplier_siret")
+	if siret:
+		existing_siret = frappe.db.get_value("Supplier", matched_supplier, "siret")
+		existing_siren = frappe.db.get_value("Supplier", matched_supplier, "siren")
+		existing_tax_id = frappe.db.get_value("Supplier", matched_supplier, "tax_id")
+
+		supplier_identifiers = {v for v in [existing_siret, existing_siren, existing_tax_id] if v}
+
+		if supplier_identifiers:
+			siret_match = any(
+				siret.startswith(id) or id.startswith(siret) or siret == id for id in supplier_identifiers
+			)
+			if not siret_match:
+				return {
+					"status": "warning",
+					"message": frappe._(
+						"Supplier '{0}' identifiers ({1}) don't match invoice SIRET {2}."
+					).format(
+						matched_supplier,
+						", ".join(supplier_identifiers),
+						siret,
+					),
+				}
+
 	frappe.db.set_value(
 		"ePurchase Invoice",
 		name,
@@ -214,7 +239,6 @@ def match_supplier(name, matched_supplier, apply_to_all=0):
 		},
 	)
 
-	# Recalculer le statut de cette invoice
 	from erpnext_einvoicing.erpnext_einvoicing.utils.facturx import _auto_match_items
 
 	doc = frappe.get_doc("ePurchase Invoice", name)
@@ -222,33 +246,33 @@ def match_supplier(name, matched_supplier, apply_to_all=0):
 	doc._update_conversion_status()
 	doc.db_set("conversion_status", doc.conversion_status)
 
-	if apply_to_all:
-		siret = frappe.db.get_value("ePurchase Invoice", name, "supplier_siret")
-		if siret:
-			others = frappe.get_all(
+	if apply_to_all and siret:
+		others = frappe.get_all(
+			"ePurchase Invoice",
+			filters={
+				"supplier_siret": siret,
+				"name": ["!=", name],
+				"supplier_match_status": "unmatched",
+				"conversion_status": ["!=", "converted"],
+			},
+			pluck="name",
+		)
+		for other in others:
+			frappe.db.set_value(
 				"ePurchase Invoice",
-				filters={
-					"supplier_siret": siret,
-					"name": ["!=", name],
-					"supplier_match_status": "unmatched",
-					"conversion_status": ["!=", "converted"],
+				other,
+				{
+					"matched_supplier": matched_supplier,
+					"supplier_match_status": "matched",
 				},
-				pluck="name",
 			)
-			for other in others:
-				frappe.db.set_value(
-					"ePurchase Invoice",
-					other,
-					{
-						"matched_supplier": matched_supplier,
-						"supplier_match_status": "matched",
-					},
-				)
-				inv = frappe.get_doc("ePurchase Invoice", other)
-				inv._update_conversion_status()
-				inv.db_set("conversion_status", inv.conversion_status)
+			inv = frappe.get_doc("ePurchase Invoice", other)
+			inv._update_conversion_status()
+			inv.db_set("conversion_status", inv.conversion_status)
 
 	frappe.db.commit()
+
+	doc.reload()
 	matched_count = sum(1 for item in doc.items if item.match_status == "matched")
 	return {
 		"status": "ok",
