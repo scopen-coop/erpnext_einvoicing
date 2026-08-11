@@ -10,7 +10,8 @@ function __(text, replace) {
 }
 
 /*** State ***/
-
+const pendingFlows = ref(0);
+const pendingFlowsStatus = ref("ok");
 const invoices = ref([]);
 const loading = ref(false);
 const syncing = ref(false);
@@ -52,6 +53,25 @@ async function fetchInvoices(silent = false) {
 	}
 }
 
+async function checkPendingFlows() {
+	try {
+		const r = await frappe.call({
+			method: "erpnext_einvoicing.providers.sync.check_pending_flows",
+			args: { sync_type: "Purchase Invoice" },
+		});
+		if (r.message?.error) {
+			pendingFlowsStatus.value = "error";
+			pendingFlows.value = 0;
+		} else {
+			pendingFlows.value = r.message?.total || 0;
+			pendingFlowsStatus.value = pendingFlows.value > 0 ? "pending" : "ok";
+		}
+	} catch {
+		pendingFlowsStatus.value = "error";
+		pendingFlows.value = 0;
+	}
+}
+
 async function syncFlows() {
 	syncing.value = true;
 	try {
@@ -63,6 +83,7 @@ async function syncFlows() {
 		const indicator = msg.status === "ok" ? "green" : "orange";
 		frappe.show_alert({ message: msg.message || __("Sync complete"), indicator }, 5);
 		await fetchInvoices(true);
+		await checkPendingFlows();
 	} finally {
 		syncing.value = false;
 	}
@@ -600,6 +621,10 @@ async function cancelConversion(invoice) {
 
 /*** UI helpers ***/
 
+function supplierReady(invoice) {
+	return invoice.supplier_match_status === "matched" || !!invoice.ethirdparty_doc;
+}
+
 function toggleExpand(name) {
 	if (expanded.value.has(name)) {
 		expanded.value.delete(name);
@@ -629,6 +654,7 @@ onMounted(async () => {
 	});
 	buyingSettings.value = r.message || {};
 	await fetchInvoices();
+	await checkPendingFlows();
 });
 </script>
 
@@ -660,9 +686,32 @@ onMounted(async () => {
 					</span>
 				</button>
 			</div>
-			<button class="btn btn-sm btn-default" :disabled="syncing" @click="syncFlows">
+			<button
+				class="btn btn-sm btn-default position-relative"
+				:disabled="syncing"
+				@click="syncFlows"
+			>
 				<i :class="['fa', syncing ? 'fa-spinner fa-spin' : 'fa-refresh']"></i>
 				{{ __("Sync") }}
+				<span
+					v-if="pendingFlowsStatus === 'pending'"
+					class="position-absolute badge rounded-pill bg-warning"
+					style="font-size: 10px; top: -8px; left: 100%; margin-left: 2px"
+				>
+					{{ pendingFlows }}
+				</span>
+				<span
+					v-else-if="pendingFlowsStatus === 'ok'"
+					class="position-absolute rounded-circle bg-success"
+					style="width: 8px; height: 8px; top: -3px; left: 100%; margin-left: -4px"
+				>
+				</span>
+				<span
+					v-else-if="pendingFlowsStatus === 'error'"
+					class="position-absolute rounded-circle bg-danger"
+					style="width: 8px; height: 8px; top: -3px; left: 100%; margin-left: -4px"
+				>
+				</span>
 			</button>
 		</div>
 
@@ -1009,18 +1058,38 @@ onMounted(async () => {
 									>
 										<i class="fa fa-refresh"></i>
 									</button>
-									<button
-										class="btn btn-xs btn-default"
-										@click="promptMatchItem(invoice, item)"
+									<span
+										:title="
+											!supplierReady(invoice)
+												? __('Match a supplier first')
+												: ''
+										"
+										style="display: inline-block"
 									>
-										<i class="fa fa-link"></i> {{ __("Match") }}
-									</button>
-									<button
-										class="btn btn-xs btn-default"
-										@click="createItem(invoice, item)"
+										<button
+											:disabled="!supplierReady(invoice)"
+											class="btn btn-xs btn-default"
+											@click="promptMatchItem(invoice, item)"
+										>
+											<i class="fa fa-link"></i> {{ __("Match") }}
+										</button>
+									</span>
+									<span
+										:title="
+											!supplierReady(invoice)
+												? __('Match a supplier first')
+												: ''
+										"
+										style="display: inline-block"
 									>
-										<i class="fa fa-plus"></i> {{ __("Create") }}
-									</button>
+										<button
+											:disabled="!supplierReady(invoice)"
+											class="btn btn-xs btn-default"
+											@click="createItem(invoice, item)"
+										>
+											<i class="fa fa-plus"></i> {{ __("Create") }}
+										</button>
+									</span>
 								</template>
 							</div>
 						</div>

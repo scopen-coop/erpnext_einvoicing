@@ -60,7 +60,10 @@ def delete_access_token():
 @frappe.whitelist()
 def check_pending_flows(sync_type="Purchase Invoice"):
 	frappe.only_for("System Manager")
-	return _get_provider().check_pending_flows(sync_type)
+	try:
+		return _get_provider().check_pending_flows(sync_type)
+	except Exception as e:
+		return {"has_pending": False, "total": 0, "error": str(e)}
 
 
 @frappe.whitelist()
