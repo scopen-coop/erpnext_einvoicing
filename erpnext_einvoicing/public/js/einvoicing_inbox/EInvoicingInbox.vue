@@ -740,6 +740,7 @@ onMounted(async () => {
 			</div>
 			<button
 				class="btn btn-sm btn-default position-relative"
+				style="margin-right: 20px"
 				:disabled="syncing"
 				@click="syncFlows"
 			>
@@ -748,20 +749,20 @@ onMounted(async () => {
 				<span
 					v-if="pendingFlowsStatus === 'pending'"
 					class="position-absolute badge rounded-pill bg-warning"
-					style="font-size: 10px; top: -8px; left: 100%; margin-left: 2px"
+					style="font-size: 10px; top: -8px; left: 85%"
 				>
 					{{ pendingFlows }}
 				</span>
 				<span
 					v-else-if="pendingFlowsStatus === 'ok'"
 					class="position-absolute rounded-circle bg-success"
-					style="width: 8px; height: 8px; top: -3px; left: 100%; margin-left: -4px"
+					style="width: 8px; height: 8px; top: -3px; left: 90%"
 				>
 				</span>
 				<span
 					v-else-if="pendingFlowsStatus === 'error'"
 					class="position-absolute rounded-circle bg-danger"
-					style="width: 8px; height: 8px; top: -3px; left: 100%; margin-left: -4px"
+					style="width: 8px; height: 8px; top: -3px; left: 90%"
 				>
 				</span>
 			</button>
@@ -809,6 +810,15 @@ onMounted(async () => {
 							style="font-weight: 600"
 						>
 							{{ invoice.name }}
+						</a>
+						<a
+							v-if="invoice.pdf_url"
+							:href="invoice.pdf_url"
+							target="_blank"
+							style="color: #888; margin-right: 6px"
+							:title="__('View PDF')"
+						>
+							<i class="fa fa-file-pdf-o" style="font-size: 13px"></i>
 						</a>
 						<span v-if="invoice.buyer_siret" style="color: #888; font-size: 12px">
 							{{ invoice.company || invoice.buyer_siret }}

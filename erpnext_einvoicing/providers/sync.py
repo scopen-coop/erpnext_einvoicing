@@ -155,6 +155,16 @@ def get_einvoicing_inbox():
 			order_by="idx asc",
 		)
 
+		attachment = frappe.db.get_value(
+			"File",
+			{
+				"attached_to_doctype": "ePurchase Invoice",
+				"attached_to_name": inv["name"],
+			},
+			"file_url",
+		)
+		inv["pdf_url"] = attachment or None
+
 		company = inv.get("company")
 		for item in inv["items"]:
 			if item.get("tax_rate") and company:

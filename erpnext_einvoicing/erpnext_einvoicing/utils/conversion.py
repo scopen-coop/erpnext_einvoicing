@@ -2,6 +2,7 @@
 # For license information, please see license.txt
 
 import frappe
+from frappe.utils.file_manager import save_file
 
 
 def build_purchase_invoice(epurchase_invoice):
@@ -55,6 +56,25 @@ def build_purchase_invoice(epurchase_invoice):
 
 	pi.insert(ignore_permissions=True)
 	epurchase_invoice.db_set("purchase_invoice", pi.name)
+
+	attachments = frappe.get_all(
+		"File",
+		filters={
+			"attached_to_doctype": "ePurchase Invoice",
+			"attached_to_name": epurchase_invoice.name,
+		},
+		fields=["name", "file_name", "file_url"],
+	)
+	for attachment in attachments:
+		file_doc = frappe.get_doc("File", attachment.name)
+		save_file(
+			fname=attachment.file_name,
+			content=file_doc.get_content(),
+			dt="Purchase Invoice",
+			dn=pi.name,
+			is_private=1,
+		)
+
 	frappe.db.commit()
 
 	return pi

@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Literal
 
 import frappe
+from frappe.utils.file_manager import save_file
 from lxml import etree
 
 ### Constants
@@ -45,7 +46,7 @@ def create_e_purchase_invoice(pdf_content: bytes, flow_data: dict):
 		)
 
 	data = _parse_cii(xml_bytes)
-	return _create_doc(data, xml_bytes, flow_data)
+	return _create_doc(data, xml_bytes, flow_data, pdf_content)
 
 
 ### XML extraction
@@ -219,7 +220,7 @@ def _parse_cii(xml_bytes: bytes):
 ### Document creation
 
 
-def _create_doc(data: dict, xml_bytes: bytes, flow_data: dict):
+def _create_doc(data: dict, xml_bytes: bytes, flow_data: dict, pdf_content=None):
 	settings = frappe.get_single("eInvoicing Settings")
 
 	doc = frappe.new_doc("ePurchase Invoice")
@@ -255,6 +256,15 @@ def _create_doc(data: dict, xml_bytes: bytes, flow_data: dict):
 	doc.raw_flow_data = json.dumps(flow_data, ensure_ascii=False, indent=2)
 
 	doc.insert(ignore_permissions=True)
+
+	if pdf_content:
+		save_file(
+			fname=f"{doc.invoice_number or doc.name}.pdf",
+			content=pdf_content,
+			dt="ePurchase Invoice",
+			dn=doc.name,
+			is_private=1,
+		)
 	frappe.db.commit()
 
 	_auto_match_supplier(doc, data)
