@@ -514,6 +514,40 @@ async function rematchItems(invoice) {
 	await fetchInvoices(true);
 }
 
+function editItemTaxRate(invoice, item) {
+	frappe.prompt(
+		[
+			{
+				fieldname: "account_head",
+				fieldtype: "Link",
+				options: "Account",
+				label: __("Tax Account"),
+				default: item.tax_account_head || "",
+				get_query: () => ({
+					filters: {
+						company: invoice.company,
+						account_type: "Tax",
+						root_type: "Asset",
+					},
+				}),
+			},
+		],
+		async (values) => {
+			await frappe.call({
+				method: "erpnext_einvoicing.providers.sync.update_item_tax_rate",
+				args: {
+					name: invoice.name,
+					item_idx: item.idx,
+					account_head: values.account_head,
+				},
+			});
+			await fetchInvoices(true);
+		},
+		__("Edit Tax Account"),
+		__("Save")
+	);
+}
+
 async function confirmDeleteMatchedItem(invoice, item) {
 	const siblings = await frappe.call({
 		method: "erpnext_einvoicing.providers.sync.count_similar_unmatched",
@@ -776,6 +810,9 @@ onMounted(async () => {
 						>
 							{{ invoice.name }}
 						</a>
+						<span v-if="invoice.buyer_siret" style="color: #888; font-size: 12px">
+							{{ invoice.company || invoice.buyer_siret }}
+						</span>
 						<span
 							:class="`indicator-pill ${
 								{ pending: 'orange', ready: 'green', converted: 'blue' }[
@@ -908,7 +945,7 @@ onMounted(async () => {
 								class="indicator-pill red"
 								style="font-size: 11px"
 							>
-								SIRENE ✗
+								SIRENE <i class="fa fa-close"></i>
 							</span>
 						</template>
 					</div>
@@ -1038,6 +1075,21 @@ onMounted(async () => {
 								<span style="color: #666; margin-left: 8px; font-size: 12px">
 									{{ item.qty }} ×
 									{{ formatCurrency(item.unit_price, invoice.currency) }}
+								</span>
+								<span style="font-size: 11px; color: #aaa; margin-left: 16px">
+									<span v-if="item.tax_account_name">
+										{{ item.tax_account_name }}
+										<span style="opacity: 0.6">({{ item.tax_rate }}%)</span>
+									</span>
+									<span v-else-if="item.tax_rate">
+										TVA {{ item.tax_rate }}%
+									</span>
+									<span v-else>{{ __("No tax") }}</span>
+									<i
+										class="fa fa-pencil"
+										style="cursor: pointer; margin-left: 6px"
+										@click="editItemTaxRate(invoice, item)"
+									></i>
 								</span>
 							</div>
 							<div style="display: flex; align-items: center; gap: 8px">

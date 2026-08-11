@@ -6,7 +6,6 @@ import frappe
 
 def after_migrate():
 	_create_uom_mappings()
-	_create_tax_mappings()
 
 
 ### Private
@@ -38,22 +37,4 @@ def _create_uom_mappings():
 		doc.erpnext_uom = erpnext_uom
 		doc.insert(ignore_permissions=True)
 
-	frappe.db.commit()
-
-
-def _create_tax_mappings():
-	mappings = [
-		("20.0", "TVA 20%"),
-		("10.0", "TVA 10%"),
-		("5.5", "TVA 5.5%"),
-		("2.1", "TVA 2.1%"),
-		("0.0", "Exonéré / Hors TVA"),
-	]
-	for tax_rate, description in mappings:
-		if frappe.db.exists("eInvoicing Tax Mapping", tax_rate):
-			continue
-		doc = frappe.new_doc("eInvoicing Tax Mapping")
-		doc.tax_rate = tax_rate
-		doc.description = description
-		doc.insert(ignore_permissions=True)
 	frappe.db.commit()

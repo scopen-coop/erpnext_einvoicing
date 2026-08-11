@@ -30,6 +30,8 @@ def build_purchase_invoice(epurchase_invoice):
 			title=frappe._("Missing Supplier"),
 		)
 
+	pi.company = epurchase_invoice.company or frappe.defaults.get_user_default("Company")
+
 	if epurchase_invoice.purchase_order:
 		pi.purchase_order = epurchase_invoice.purchase_order
 
@@ -49,10 +51,7 @@ def build_purchase_invoice(epurchase_invoice):
 			},
 		)
 
-	tax_rates = [item.tax_rate for item in epurchase_invoice.items]
-	taxes_template = _resolve_taxes(tax_rates)
-	if taxes_template:
-		pi.taxes_and_charges = taxes_template
+	_build_taxes(epurchase_invoice, pi)
 
 	pi.insert(ignore_permissions=True)
 	epurchase_invoice.db_set("purchase_invoice", pi.name)
@@ -77,16 +76,37 @@ def _resolve_uom(uom_code):
 	return fallback
 
 
-def _resolve_taxes(tax_rates):
-	"""Resolve unique tax rates from items to a Purchase Taxes Template."""
-	if not tax_rates:
-		return None
-	# Use the most common non-zero rate
-	rates = [r for r in tax_rates if r and float(r) > 0]
-	if not rates:
-		return None
-	key = f"{max(set(rates), key=rates.count):.1f}"
-	return frappe.db.get_value("eInvoicing Tax Mapping", key, "purchase_taxes_template")
+def _build_taxes(epurchase_invoice, pi):
+	"""Ajoute une ligne de taxe par taux distinct basé sur les comptes de la société."""
+	tax_groups = {}
+	for item in epurchase_invoice.items:
+		if not item.tax_rate:
+			continue
+		rate = round(float(item.tax_rate), 1)
+		tax_groups[rate] = tax_groups.get(rate, 0) + float(item.amount or 0)
+
+	for rate, base_amount in tax_groups.items():
+		account = frappe.db.get_value(
+			"Account",
+			{
+				"company": pi.company,
+				"account_type": "Tax",
+				"tax_rate": rate,
+				"root_type": "Asset",
+			},
+			"name",
+		)
+		if not account:
+			continue
+		pi.append(
+			"taxes",
+			{
+				"charge_type": "Actual",
+				"account_head": account,
+				"description": f"TVA {rate}%",
+				"tax_amount": round(base_amount * rate / 100, 2),
+			},
+		)
 
 
 def _create_supplier_from_ethirdparty(ethirdparty_name):

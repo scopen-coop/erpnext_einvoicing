@@ -132,6 +132,12 @@ def _parse_cii(xml_bytes: bytes):
 	]
 	supplier_address = "\n".join(p for p in address_parts if p)
 
+	### Buyer
+	buyer_base = "//rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerTradeParty"
+	buyer_siret = get(f"{buyer_base}/ram:SpecifiedLegalOrganization/ram:ID/text()") or get(
+		f"{buyer_base}/ram:SpecifiedTaxRegistration[ram:ID/@schemeID='0002']/ram:ID/text()"
+	)
+
 	### Settlement
 	settlement_base = "//rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement"
 	currency = get(f"{settlement_base}/ram:InvoiceCurrencyCode/text()") or "EUR"
@@ -202,6 +208,7 @@ def _parse_cii(xml_bytes: bytes):
 		"supplier_siret": supplier_siret,
 		"supplier_vat": supplier_vat,
 		"supplier_address_raw": supplier_address,
+		"buyer_siret": buyer_siret,
 		"total_ht": total_ht,
 		"total_vat": total_vat,
 		"total_ttc": total_ttc,
@@ -233,6 +240,13 @@ def _create_doc(data: dict, xml_bytes: bytes, flow_data: dict):
 	doc.total_ht = data.get("total_ht", 0)
 	doc.total_vat = data.get("total_vat", 0)
 	doc.total_ttc = data.get("total_ttc", 0)
+
+	buyer_siret = data.get("buyer_siret", "")
+	doc.buyer_siret = buyer_siret
+	if buyer_siret:
+		company = frappe.db.get_value("Company", {"tax_id": buyer_siret}, "name")
+		if company:
+			doc.company = company
 
 	for item in data.get("items", []):
 		doc.append("items", item)

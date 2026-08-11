@@ -129,6 +129,9 @@ def get_einvoicing_inbox():
 			"purchase_order",
 			"purchase_receipt",
 			"approved_platform",
+			"purchase_invoice",
+			"company",
+			"buyer_siret",
 		],
 		order_by="creation desc",
 	)
@@ -151,6 +154,22 @@ def get_einvoicing_inbox():
 			],
 			order_by="idx asc",
 		)
+
+		company = inv.get("company")
+		for item in inv["items"]:
+			if item.get("tax_rate") and company:
+				item["tax_account_name"] = frappe.db.get_value(
+					"Account",
+					{
+						"company": company,
+						"account_type": "Tax",
+						"tax_rate": item["tax_rate"],
+						"root_type": "Asset",
+					},
+					"account_name",
+				)
+			else:
+				item["tax_account_name"] = None
 
 		if inv.get("ethirdparty"):
 			inv["ethirdparty_doc"] = frappe.db.get_value(
@@ -601,6 +620,19 @@ def update_ethirdparty(name, data):
 	for field, value in data.items():
 		doc.set(field, value)
 	doc.status = "ready"
+	doc.save(ignore_permissions=True)
+	frappe.db.commit()
+	return {"status": "ok"}
+
+
+@frappe.whitelist()
+def update_item_tax_rate(name, item_idx, tax_rate):
+	item_idx = int(item_idx)
+	doc = frappe.get_doc("ePurchase Invoice", name)
+	for item in doc.items:
+		if item.idx == item_idx:
+			item.tax_rate = float(tax_rate) if tax_rate else 0
+			break
 	doc.save(ignore_permissions=True)
 	frappe.db.commit()
 	return {"status": "ok"}
