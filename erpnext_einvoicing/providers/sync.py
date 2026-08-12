@@ -426,18 +426,39 @@ def unlink_matched_supplier(name, apply_to_all=0):
 		},
 	)
 
+	doc.reload()
+	for item in doc.items:
+		item.matched_item = None
+		item.match_status = "unmatched"
+	doc.save(ignore_permissions=True)
+
 	if apply_to_all and siret:
-		frappe.db.set_value(
+		others = frappe.get_all(
 			"ePurchase Invoice",
-			{"supplier_siret": siret, "name": ["!=", name], "conversion_status": ["!=", "converted"]},
-			{
-				"matched_supplier": None,
-				"supplier_match_status": "unmatched",
-				"ethirdparty": None,
-				"sirene_status": None,
-				"conversion_status": "pending",
+			filters={
+				"supplier_siret": siret,
+				"name": ["!=", name],
+				"conversion_status": ["!=", "converted"],
 			},
+			pluck="name",
 		)
+		for other_name in others:
+			frappe.db.set_value(
+				"ePurchase Invoice",
+				other_name,
+				{
+					"matched_supplier": None,
+					"supplier_match_status": "unmatched",
+					"ethirdparty": None,
+					"sirene_status": None,
+					"conversion_status": "pending",
+				},
+			)
+			other_doc = frappe.get_doc("ePurchase Invoice", other_name)
+			for item in other_doc.items:
+				item.matched_item = None
+				item.match_status = "unmatched"
+			other_doc.save(ignore_permissions=True)
 
 	if ethirdparty_name:
 		others = frappe.db.count("ePurchase Invoice", {"ethirdparty": ethirdparty_name})
@@ -856,3 +877,13 @@ def sync_incoming_flows():
 			frappe.log_error(result.get("message"), "eInvoicing scheduled sync error")
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), "eInvoicing scheduled sync exception")
+
+
+@frappe.whitelist()
+def send_lifecycle_status(name, status_code, refusal_reasons=None):
+	if isinstance(refusal_reasons, str):
+		import json as _json
+
+		refusal_reasons = _json.loads(refusal_reasons) if refusal_reasons else None
+	doc = frappe.get_doc("ePurchase Invoice", name)
+	return _get_provider().send_lifecycle(status_code, doc, refusal_reasons)

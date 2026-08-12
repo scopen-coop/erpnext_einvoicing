@@ -110,6 +110,28 @@ class EsalinkProvider(BaseProvider):
 			),
 		}
 
+	### Lifecycle
+
+	def _build_lifecycle_flow_info(self, filename, doc):
+		return {"flowSyntax": "CDAR", "name": filename}
+
+	def _send_cdar(self, xml_bytes, filename, flow_info):
+		from io import BytesIO
+
+		files_payload = {
+			"file": (filename, BytesIO(xml_bytes), "application/xml"),
+			"flowInfo": (None, frappe.as_json(flow_info), "text/plain"),
+		}
+		result = self._call_api_multipart("flows", files_payload)
+		if result["status_code"] not in (200, 202):
+			frappe.throw(
+				frappe._("Failed to send CDAR (HTTP {0}): {1}").format(
+					result["status_code"], result.get("response", "")
+				),
+				title=frappe._("Lifecycle Send Error"),
+			)
+		return result
+
 	### Sample invoice
 
 	def send_sample_invoice(self):
@@ -185,16 +207,15 @@ class EsalinkProvider(BaseProvider):
 		return {"has_pending": total > 0, "total": total}
 
 	def sync_flows(self, sync_type: str):
-		payload = self._build_search_payload(sync_type, limit=1)
+		payload = self._build_search_payload(sync_type, limit=1000)
 		result = self.call_api("flows/search", "POST", params=payload)
 		if result["status_code"] not in (200, 202):
 			return {
 				"status": "error",
 				"message": frappe._("Failed to reach platform (HTTP {0}).").format(result["status_code"]),
 			}
-
-		total = result["response"].get("total", 0)
-		if total == 0:
+		flows_raw = result["response"].get("results", [])
+		if not flows_raw:
 			return {
 				"status": "ok",
 				"message": frappe._("No flows to synchronize."),
@@ -203,17 +224,9 @@ class EsalinkProvider(BaseProvider):
 				"skipped": 0,
 				"errors": 0,
 			}
-
-		payload["limit"] = total
-		result = self.call_api("flows/search", "POST", params=payload)
-		if result["status_code"] not in (200, 202):
-			return {
-				"status": "error",
-				"message": frappe._("Failed to retrieve flows (HTTP {0}).").format(result["status_code"]),
-			}
-
+		total = len(flows_raw)
 		flows = sorted(
-			result["response"].get("results", []),
+			flows_raw,
 			key=lambda f: f.get("updatedAt", ""),
 		)
 
@@ -373,3 +386,27 @@ class EsalinkProvider(BaseProvider):
 		if not api_key:
 			return {}
 		return {self.platform.api_key_header: api_key}
+
+	def _call_api_multipart(self, resource, files_payload):
+		"""POST multipart/form-data — pour l'envoi de flux CDAR."""
+		if self.is_token_expired():
+			self.get_access_token()
+
+		base_url = self.get_base_url()
+		url = f"{base_url}{resource}"
+
+		headers = {
+			"Authorization": f"Bearer {self.settings.get_password('access_token')}",
+			**self._build_api_key_header(),
+		}
+		try:
+			response = requests.post(url, headers=headers, files=files_payload, timeout=30)
+		except requests.exceptions.ConnectionError:
+			return {"status_code": 0, "response": "Connection error"}
+		except requests.exceptions.Timeout:
+			return {"status_code": 0, "response": "Timeout"}
+
+		try:
+			return {"status_code": response.status_code, "response": response.json()}
+		except Exception:
+			return {"status_code": response.status_code, "response": response.text}
