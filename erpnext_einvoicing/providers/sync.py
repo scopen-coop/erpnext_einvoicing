@@ -105,10 +105,17 @@ def link_purchase_receipt(name, purchase_receipt):
 
 
 @frappe.whitelist()
-def get_einvoicing_inbox():
+def get_einvoicing_inbox(date_from=None, date_to=None):
+	filters = {"conversion_status": ["in", ["pending", "ready", "converted", "refused"]]}
+	if date_from and date_to:
+		filters["invoice_date"] = ["between", [date_from, date_to]]
+	elif date_from:
+		filters["invoice_date"] = [">=", date_from]
+	elif date_to:
+		filters["invoice_date"] = ["<=", date_to]
 	invoices = frappe.get_all(
 		"ePurchase Invoice",
-		filters={"conversion_status": ["in", ["pending", "ready", "converted", "refused"]]},
+		filters=filters,
 		fields=[
 			"name",
 			"conversion_status",

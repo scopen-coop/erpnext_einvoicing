@@ -17,6 +17,9 @@ const loading = ref(false);
 const syncing = ref(false);
 const filter = ref("pending");
 const expanded = ref(new Set());
+/*const datePreset = ref("30");
+const dateFrom = ref("");
+const dateTo = ref("");*/
 
 /*** Computed ***/
 
@@ -33,6 +36,73 @@ const counts = computed(() => ({
 	refused: invoices.value.filter((i) => i.conversion_status === "refused").length,
 }));
 
+/*const dateRange = computed(() => {
+	const today = frappe.datetime.get_today();
+	if (datePreset.value === "all") return {date_from: null, date_to: null};
+	if (datePreset.value === "today") return {date_from: today, date_to: today};
+	if (datePreset.value === "custom") return {date_from: dateFrom.value || null, date_to: dateTo.value || null};
+	const from = frappe.datetime.add_days(today, -parseInt(datePreset.value) + 1);
+	return {date_from: from, date_to: today};
+});*/
+
+/*** Date picker ***/
+const showDatePicker = ref(false);
+const datePreset = ref("30");
+const dateFrom = ref("");
+const dateTo = ref("");
+const pendingPreset = ref("30");
+const pendingFrom = ref("");
+const pendingTo = ref("");
+
+const PRESETS = [
+	{ key: "all", label: "All dates" },
+	{ key: "today", label: "Today" },
+	{ key: "7", label: "Last 7 days" },
+	{ key: "30", label: "Last 30 days" },
+	{ key: "90", label: "Last 90 days" },
+	{ key: "365", label: "Last 12 months" },
+	{ key: "custom", label: "Custom" },
+];
+
+const dateRange = computed(() => {
+	const today = frappe.datetime.get_today();
+	if (datePreset.value === "all") return { date_from: null, date_to: null };
+	if (datePreset.value === "today") return { date_from: today, date_to: today };
+	if (datePreset.value === "custom")
+		return { date_from: dateFrom.value || null, date_to: dateTo.value || null };
+	const from = frappe.datetime.add_days(today, -parseInt(datePreset.value) + 1);
+	return { date_from: from, date_to: today };
+});
+
+const datePickerLabel = computed(() => {
+	const preset = PRESETS.find((p) => p.key === datePreset.value);
+	if (datePreset.value === "custom" && dateFrom.value && dateTo.value) {
+		return `${frappe.datetime.str_to_user(dateFrom.value)} » ${frappe.datetime.str_to_user(
+			dateTo.value
+		)}`;
+	}
+	return preset ? __(preset.label) : __("All dates");
+});
+
+function openDatePicker() {
+	pendingPreset.value = datePreset.value;
+	pendingFrom.value = dateFrom.value;
+	pendingTo.value = dateTo.value;
+	showDatePicker.value = true;
+}
+
+function applyDatePicker() {
+	datePreset.value = pendingPreset.value;
+	dateFrom.value = pendingFrom.value;
+	dateTo.value = pendingTo.value;
+	showDatePicker.value = false;
+	fetchInvoices(true);
+}
+
+function closeDatePicker() {
+	showDatePicker.value = false;
+}
+
 /*** API ***/
 
 async function fetchInvoices(silent = false) {
@@ -43,6 +113,7 @@ async function fetchInvoices(silent = false) {
 	try {
 		const res = await frappe.call({
 			method: "erpnext_einvoicing.providers.sync.get_einvoicing_inbox",
+			args: { date_from: dateRange.value.date_from, date_to: dateRange.value.date_to },
 		});
 		invoices.value = res.message || [];
 	} finally {
@@ -243,7 +314,7 @@ async function enrichFromSiret(invoice) {
 		return;
 	}
 
-	// ok ou warning → dialog de confirmation
+	// ok ou warning -> dialog de confirmation
 	const data = msg.data || {};
 	const missingFields = msg.missing_fields || [];
 
@@ -824,6 +895,142 @@ async function refreshLifecycleLog(invoice) {
 						{{ counts[tab] }}
 					</span>
 				</button>
+			</div>
+			<!-- Date picker -->
+			<div style="position: relative">
+				<button
+					class="btn btn-sm btn-default"
+					style="font-size: 12px; display: flex; align-items: center; gap: 6px"
+					@click="openDatePicker"
+				>
+					<i class="fa fa-calendar" style="color: #888"></i>
+					{{ datePickerLabel }}
+					<i class="fa fa-caret-down" style="color: #888; font-size: 10px"></i>
+				</button>
+
+				<!-- Dropdown -->
+				<div
+					v-if="showDatePicker"
+					style="
+						position: absolute;
+						top: calc(100% + 6px);
+						right: 0;
+						z-index: 1000;
+						background: #fff;
+						border: 1px solid #d1d8dd;
+						border-radius: 8px;
+						box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+						display: flex;
+						min-width: 480px;
+					"
+				>
+					<!-- Presets -->
+					<div style="width: 180px; border-right: 1px solid #f0f0f0; padding: 8px 0">
+						<div
+							v-for="preset in PRESETS"
+							:key="preset.key"
+							@click="pendingPreset = preset.key"
+							style="
+								padding: 8px 16px;
+								cursor: pointer;
+								font-size: 13px;
+								border-radius: 4px;
+								margin: 0 6px;
+							"
+							:style="
+								pendingPreset === preset.key
+									? 'background: #e8f4f0; color: #2490ef; font-weight: 500'
+									: 'color: #333'
+							"
+						>
+							{{ __(preset.label) }}
+						</div>
+					</div>
+
+					<!-- Right side -->
+					<div
+						style="
+							flex: 1;
+							padding: 16px;
+							display: flex;
+							flex-direction: column;
+							justify-content: space-between;
+						"
+					>
+						<!-- Custom inputs -->
+						<div v-if="pendingPreset === 'custom'">
+							<div
+								style="
+									font-size: 12px;
+									color: #888;
+									margin-bottom: 12px;
+									text-transform: uppercase;
+									letter-spacing: 0.5px;
+								"
+							>
+								{{ __("Date range") }}
+							</div>
+							<div style="display: flex; align-items: center; gap: 8px">
+								<div style="flex: 1">
+									<div style="font-size: 11px; color: #aaa; margin-bottom: 4px">
+										{{ __("From") }}
+									</div>
+									<input
+										v-model="pendingFrom"
+										type="date"
+										class="form-control form-control-sm"
+										style="font-size: 12px"
+									/>
+								</div>
+								<div style="color: #ccc; margin-top: 16px">&raquo;</div>
+								<div style="flex: 1">
+									<div style="font-size: 11px; color: #aaa; margin-bottom: 4px">
+										{{ __("To") }}
+									</div>
+									<input
+										v-model="pendingTo"
+										type="date"
+										class="form-control form-control-sm"
+										style="font-size: 12px"
+									/>
+								</div>
+							</div>
+						</div>
+
+						<!-- Preset summary -->
+						<div v-else style="color: #aaa; font-size: 13px; padding-top: 8px">
+							{{ __(PRESETS.find((p) => p.key === pendingPreset)?.label || "") }}
+						</div>
+
+						<!-- Footer -->
+						<div
+							style="
+								display: flex;
+								justify-content: flex-end;
+								gap: 8px;
+								margin-top: 24px;
+							"
+						>
+							<button class="btn btn-sm btn-default" @click="closeDatePicker">
+								{{ __("Cancel") }}
+							</button>
+							<button
+								class="btn btn-sm btn-primary"
+								style="min-width: 80px"
+								@click="applyDatePicker"
+							>
+								{{ __("Apply") }}
+							</button>
+						</div>
+					</div>
+				</div>
+
+				<!-- Backdrop -->
+				<div
+					v-if="showDatePicker"
+					style="position: fixed; inset: 0; z-index: 999"
+					@click="closeDatePicker"
+				></div>
 			</div>
 			<button
 				class="btn btn-sm btn-default position-relative"
