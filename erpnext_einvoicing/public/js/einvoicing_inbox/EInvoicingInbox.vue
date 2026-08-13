@@ -765,6 +765,36 @@ onMounted(async () => {
 	await fetchInvoices();
 	await checkPendingFlows();
 });
+
+function lifecycleIcon(log) {
+	if (log.ack_status === "ok") return "fa fa-check-circle";
+	if (log.ack_status === "error") return "fa fa-exclamation-circle";
+	return "fa fa-clock-o";
+}
+
+function lifecycleIconColor(log) {
+	if (log.ack_status === "ok") return "#5cb85c";
+	if (log.ack_status === "error") return "#d9534f";
+	return "#aaa";
+}
+
+function lifecycleTooltip(log) {
+	if (log.ack_status === "ok") return __("Acknowledged by platform");
+	if (log.ack_status === "error" && log.error_type === "data")
+		return (log.ack_message || "") + " - " + __("Data error (contact support)");
+	if (log.ack_status === "error" && log.error_type === "platform")
+		return (log.ack_message || "") + " - " + __("Platform error");
+	return __("Pending acknowledgement");
+}
+
+async function refreshLifecycleLog(invoice) {
+	if (!invoice.last_lifecycle_log) return;
+	await frappe.call({
+		method: "erpnext_einvoicing.providers.sync.poll_single_lifecycle_log",
+		args: { log_name: invoice.last_lifecycle_log.name },
+	});
+	await fetchInvoices(true);
+}
 </script>
 
 <template>
@@ -891,6 +921,45 @@ onMounted(async () => {
 							}`"
 						>
 							{{ __(invoice.conversion_status) }}
+						</span>
+						<span
+							v-if="invoice.last_lifecycle_log"
+							style="display: flex; align-items: center; gap: 4px; margin-left: 4px"
+						>
+							<i
+								:class="lifecycleIcon(invoice.last_lifecycle_log)"
+								:style="`color: ${lifecycleIconColor(
+									invoice.last_lifecycle_log
+								)}; opacity: 0.6; font-size: 11px`"
+								:title="lifecycleTooltip(invoice.last_lifecycle_log)"
+							></i>
+							<span style="font-size: 11px; color: #bbb">
+								[{{ invoice.last_lifecycle_log.status_code }}]
+								{{ invoice.last_lifecycle_log.status_label }}
+								<span
+									v-if="invoice.last_lifecycle_log.ack_status === 'error'"
+									style="font-size: 10px; color: #ccc"
+								>
+									·
+									{{
+										invoice.last_lifecycle_log.error_type === "data"
+											? __("Data error")
+											: __("Platform error")
+									}}
+								</span>
+							</span>
+							<i
+								v-if="invoice.last_lifecycle_log.ack_status !== 'ok'"
+								class="fa fa-refresh"
+								style="
+									font-size: 10px;
+									color: #ccc;
+									cursor: pointer;
+									margin-left: 2px;
+								"
+								:title="__('Re-poll acknowledgement')"
+								@click.stop="refreshLifecycleLog(invoice)"
+							></i>
 						</span>
 					</div>
 					<div

@@ -165,6 +165,15 @@ def get_einvoicing_inbox():
 		)
 		inv["pdf_url"] = attachment or None
 
+		last_log_list = frappe.get_all(
+			"eInvoicing Lifecycle Log",
+			filters={"parent": inv["name"]},
+			fields=["name", "status_code", "status_label", "ack_status", "ack_message", "error_type"],
+			order_by="sent_at desc",
+			limit=1,
+		)
+		inv["last_lifecycle_log"] = last_log_list[0] if last_log_list else None
+
 		company = inv.get("company")
 		for item in inv["items"]:
 			if item.get("tax_rate") and company:
@@ -907,6 +916,79 @@ def sync_incoming_flows():
 			frappe.log_error(result.get("message"), "eInvoicing scheduled sync error")
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), "eInvoicing scheduled sync exception")
+
+
+def poll_lifecycle_acknowledgements():
+	"""Called by scheduler"""
+	try:
+		provider = _get_provider()
+		pending_logs = frappe.get_all(
+			"eInvoicing Lifecycle Log",
+			filters={"ack_status": "pending"},
+			fields=["name", "cdar_flow_id", "parent"],
+		)
+		for log in pending_logs:
+			_poll_one_lifecycle_log(provider, log)
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "eInvoicing lifecycle poll exception")
+
+
+def _poll_one_lifecycle_log(provider, log):
+	try:
+		result = provider.call_api(
+			f"flows/{log.cdar_flow_id}",
+			"GET",
+			params={"docType": "Metadata"},
+			extra_headers={"Accept": "application/octet-stream"},
+		)
+		if result["status_code"] not in (200, 202):
+			frappe.db.set_value(
+				"eInvoicing Lifecycle Log",
+				log.name,
+				{
+					"ack_status": "error",
+					"error_type": "platform",
+					"ack_message": frappe._("HTTP {0}").format(result["status_code"]),
+				},
+			)
+			frappe.db.commit()
+			return
+
+		ack = result["response"].get("acknowledgement", {})
+		ack_status = ack.get("status", "")
+
+		if ack_status == "Ok":
+			frappe.db.set_value(
+				"eInvoicing Lifecycle Log",
+				log.name,
+				{"ack_status": "ok", "error_type": None, "ack_message": None},
+			)
+		elif ack_status == "Error":
+			details = ack.get("details", [])
+			msg = details[0].get("reasonMessage", "") if details else ""
+			frappe.db.set_value(
+				"eInvoicing Lifecycle Log",
+				log.name,
+				{"ack_status": "error", "error_type": "data", "ack_message": msg},
+			)
+		frappe.db.commit()
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), f"eInvoicing lifecycle poll — {log.name}")
+
+
+@frappe.whitelist()
+def poll_single_lifecycle_log(log_name):
+	provider = _get_provider()
+	log = frappe.get_all(
+		"eInvoicing Lifecycle Log",
+		filters={"name": log_name},
+		fields=["name", "cdar_flow_id", "parent"],
+		limit=1,
+	)
+	if not log:
+		return {"status": "error"}
+	_poll_one_lifecycle_log(provider, log[0])
+	return {"status": "ok"}
 
 
 @frappe.whitelist()

@@ -38,6 +38,8 @@
   "purchase_receipt",
   "items_section",
   "items",
+  "lifecycle_section",
+  "lifecycle_logs",
   "raw_section",
   "xml_content",
   "raw_flow_data"
@@ -57,7 +59,8 @@
    "label": "Status",
    "options": "pending\nready\nconverted\nrefused",
    "reqd": 1,
-   "in_list_view": 1
+   "in_list_view": 1,
+   "read_only": 1
   },
   {
    "fieldname": "purchase_invoice",
@@ -145,7 +148,8 @@
    "fieldtype": "Select",
    "label": "Supplier Match",
    "options": "unmatched\nmatched\nethirdparty\ncreated",
-   "in_list_view": 1
+   "in_list_view": 1,
+   "read_only": 1
   },
   {
    "fieldname": "sirene_status",
@@ -253,6 +257,19 @@
    "label": "Items",
    "options": "ePurchase Invoice Item",
    "reqd": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "lifecycle_section",
+   "fieldtype": "Section Break",
+   "label": "Lifecycle"
+  },
+  {
+   "fieldname": "lifecycle_logs",
+   "fieldtype": "Table",
+   "label": "Lifecycle Logs",
+   "options": "eInvoicing Lifecycle Log",
+   "read_only": 1
   },
   {
    "collapsible": 1,

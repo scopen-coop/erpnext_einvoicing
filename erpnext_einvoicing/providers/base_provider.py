@@ -156,7 +156,17 @@ class BaseProvider(ABC):
 
 		filename = f"Lifecycle-{status_code}-{doc.invoice_number}.xml"[:255]
 		flow_info = self._build_lifecycle_flow_info(filename, doc)
-		return self._send_cdar(xml_bytes, filename, flow_info)
+
+		result = self._send_cdar(xml_bytes, filename, flow_info)
+		cdar_flow_id = ""
+		if isinstance(result.get("response"), dict):
+			cdar_flow_id = result["response"].get("flowId", "")
+		if cdar_flow_id and getattr(doc, "name", None):
+			self._insert_lifecycle_log(doc.name, status_code, cdar_flow_id)
+			if cdar_flow_id and getattr(doc, "name", None):
+				self._insert_lifecycle_log(doc.name, status_code, cdar_flow_id)
+				self._immediate_poll_lifecycle_log(doc.name, cdar_flow_id)
+		return result
 
 	def _build_cdar_data_dict(self, status_code, doc, refusal_reasons=None):
 		"""Build the cdar_dict for pyfrctc.generate_cdar. Pure AFNOR XP Z12-013."""
@@ -229,3 +239,70 @@ class BaseProvider(ABC):
 	def _build_lifecycle_flow_info(self, filename, doc):
 		"""Build flowInfo for CDAR submission. Override for PA-specific additions."""
 		return {"flowSyntax": "CDAR", "name": filename}
+
+	def _insert_lifecycle_log(self, einvoice_name, status_code, cdar_flow_id):
+		try:
+			log = frappe.new_doc("eInvoicing Lifecycle Log")
+			log.parent = einvoice_name
+			log.parenttype = "ePurchase Invoice"
+			log.parentfield = "lifecycle_logs"
+			log.status_code = status_code
+			log.status_label = frappe._(LIFECYCLE_STATUS_MAP.get(status_code, status_code))
+			log.cdar_flow_id = cdar_flow_id
+			log.sent_at = frappe.utils.now_datetime()
+			log.ack_status = "pending"
+			log.insert(ignore_permissions=True)
+			frappe.db.commit()
+		except Exception:
+			frappe.log_error(
+				frappe.get_traceback(),
+				f"eInvoicing lifecycle log insert — {einvoice_name}",
+			)
+
+	def _immediate_poll_lifecycle_log(self, einvoice_name, cdar_flow_id):
+		import time
+
+		time.sleep(2)
+		try:
+			result = self.call_api(
+				f"flows/{cdar_flow_id}",
+				"GET",
+				params={"docType": "Metadata"},
+				extra_headers={"Accept": "application/octet-stream"},
+			)
+			if result["status_code"] not in (200, 202):
+				frappe.db.set_value(
+					"eInvoicing Lifecycle Log",
+					{"parent": einvoice_name, "cdar_flow_id": cdar_flow_id},
+					{
+						"ack_status": "error",
+						"error_type": "platform",
+						"ack_message": frappe._("HTTP {0}").format(result["status_code"]),
+					},
+				)
+				frappe.db.commit()
+				return
+
+			ack = result["response"].get("acknowledgement", {})
+			ack_status = ack.get("status", "")
+
+			if ack_status == "Ok":
+				frappe.db.set_value(
+					"eInvoicing Lifecycle Log",
+					{"parent": einvoice_name, "cdar_flow_id": cdar_flow_id},
+					{"ack_status": "ok", "error_type": None, "ack_message": None},
+				)
+			elif ack_status == "Error":
+				details = ack.get("details", [])
+				msg = details[0].get("reasonMessage", "") if details else ""
+				frappe.db.set_value(
+					"eInvoicing Lifecycle Log",
+					{"parent": einvoice_name, "cdar_flow_id": cdar_flow_id},
+					{"ack_status": "error", "error_type": "data", "ack_message": msg},
+				)
+			frappe.db.commit()
+		except Exception:
+			frappe.log_error(
+				frappe.get_traceback(),
+				f"eInvoicing lifecycle immediate poll — {einvoice_name}",
+			)

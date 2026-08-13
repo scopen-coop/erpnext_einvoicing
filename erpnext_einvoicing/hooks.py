@@ -166,7 +166,10 @@ scheduler_events = {
 	"cron": {
 		"*/30 * * * *": [
 			"erpnext_einvoicing.providers.sync.sync_incoming_flows",
-		]
+		],
+		"*/5 * * * *": [
+			"erpnext_einvoicing.providers.sync.poll_lifecycle_acknowledgements",
+		],
 	},
 	# "all": [
 	# 	"erpnext_einvoicing.tasks.all"
@@ -273,6 +276,7 @@ after_migrate = "erpnext_einvoicing.migrate.after_migrate"
 
 default_log_clearing_doctypes = {
 	"eInvoicing Sync Log": 90,
+	"eInvoicing Lifecycle Log": 90,
 }
 # Translation
 # ------------

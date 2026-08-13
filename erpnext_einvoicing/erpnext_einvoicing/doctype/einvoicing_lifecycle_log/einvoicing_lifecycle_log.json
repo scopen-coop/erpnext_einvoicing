@@ -1,0 +1,67 @@
+{
+  "creation": "2026-08-13 00:00:00.000000",
+  "doctype": "DocType",
+  "engine": "InnoDB",
+  "field_order": [
+    "status_code", "status_label", "sent_at",
+    "cdar_flow_id", "ack_status", "error_type", "ack_message"
+  ],
+  "fields": [
+    {
+      "fieldname": "status_code",
+      "fieldtype": "Data",
+      "label": "Status Code",
+      "read_only": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "status_label",
+      "fieldtype": "Data",
+      "label": "Status Label",
+      "read_only": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "sent_at",
+      "fieldtype": "Datetime",
+      "label": "Sent At",
+      "read_only": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "cdar_flow_id",
+      "fieldtype": "Data",
+      "label": "CDAR Flow ID",
+      "read_only": 1
+    },
+    {
+      "default": "pending",
+      "fieldname": "ack_status",
+      "fieldtype": "Select",
+      "label": "Acknowledgement",
+      "options": "pending\nok\nerror",
+      "read_only": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "error_type",
+      "fieldtype": "Select",
+      "label": "Error Type",
+      "options": "\ndata\nplatform",
+      "read_only": 1
+    },
+    {
+      "fieldname": "ack_message",
+      "fieldtype": "Small Text",
+      "label": "Acknowledgement Message",
+      "read_only": 1
+    }
+  ],
+  "istable": 1,
+  "modified": "2026-08-13 00:00:00.000000",
+  "modified_by": "Administrator",
+  "module": "ERPNext eInvoicing",
+  "name": "eInvoicing Lifecycle Log",
+  "owner": "Administrator",
+  "track_changes": 0
+}
