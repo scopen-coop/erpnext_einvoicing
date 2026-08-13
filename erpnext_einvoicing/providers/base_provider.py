@@ -163,9 +163,6 @@ class BaseProvider(ABC):
 			cdar_flow_id = result["response"].get("flowId", "")
 		if cdar_flow_id and getattr(doc, "name", None):
 			self._insert_lifecycle_log(doc.name, status_code, cdar_flow_id)
-			if cdar_flow_id and getattr(doc, "name", None):
-				self._insert_lifecycle_log(doc.name, status_code, cdar_flow_id)
-				self._immediate_poll_lifecycle_log(doc.name, cdar_flow_id)
 		return result
 
 	def _build_cdar_data_dict(self, status_code, doc, refusal_reasons=None):

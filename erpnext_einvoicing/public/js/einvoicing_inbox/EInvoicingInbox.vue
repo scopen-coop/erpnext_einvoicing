@@ -17,9 +17,6 @@ const loading = ref(false);
 const syncing = ref(false);
 const filter = ref("pending");
 const expanded = ref(new Set());
-/*const datePreset = ref("30");
-const dateFrom = ref("");
-const dateTo = ref("");*/
 
 /*** Computed ***/
 
@@ -35,15 +32,6 @@ const counts = computed(() => ({
 	converted: invoices.value.filter((i) => i.conversion_status === "converted").length,
 	refused: invoices.value.filter((i) => i.conversion_status === "refused").length,
 }));
-
-/*const dateRange = computed(() => {
-	const today = frappe.datetime.get_today();
-	if (datePreset.value === "all") return {date_from: null, date_to: null};
-	if (datePreset.value === "today") return {date_from: today, date_to: today};
-	if (datePreset.value === "custom") return {date_from: dateFrom.value || null, date_to: dateTo.value || null};
-	const from = frappe.datetime.add_days(today, -parseInt(datePreset.value) + 1);
-	return {date_from: from, date_to: today};
-});*/
 
 /*** Date picker ***/
 const showDatePicker = ref(false);

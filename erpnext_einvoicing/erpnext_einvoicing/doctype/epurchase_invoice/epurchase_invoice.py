@@ -55,72 +55,22 @@ class ePurchaseInvoice(Document):
 		pi = build_purchase_invoice(self)
 		self.db_set("conversion_status", "converted")
 
-		try:
-			from erpnext_einvoicing.erpnext_einvoicing.doctype.einvoicing_settings.einvoicing_settings import (
-				get_provider,
-			)
+		already_sent = frappe.db.exists(
+			"eInvoicing Lifecycle Log",
+			{"parent": self.name, "status_code": "204", "ack_status": "ok"},
+		)
+		if not already_sent:
+			try:
+				from erpnext_einvoicing.erpnext_einvoicing.doctype.einvoicing_settings.einvoicing_settings import (
+					get_provider,
+				)
 
-			settings = frappe.get_single("eInvoicing Settings")
-			if settings.approved_platform:
-				platform = frappe.get_doc("Approved Platforms", settings.approved_platform)
-				provider = get_provider(settings, platform)
-				provider.send_lifecycle("204", self)
-		except Exception:
-			frappe.log_error(frappe.get_traceback(), f"eInvoicing lifecycle 204 — {self.name}")
+				settings = frappe.get_single("eInvoicing Settings")
+				if settings.approved_platform:
+					platform = frappe.get_doc("Approved Platforms", settings.approved_platform)
+					provider = get_provider(settings, platform)
+					provider.send_lifecycle("204", self)
+			except Exception:
+				frappe.log_error(frappe.get_traceback(), f"eInvoicing lifecycle 204 — {self.name}")
 
 		return pi.name
-
-
-### Hook
-
-
-def on_purchase_invoice_submit(doc, method):
-	"""Called on Purchase Invoice submit — placeholder for outgoing flow."""
-	einvoice_name = frappe.db.get_value("ePurchase Invoice", {"purchase_invoice": doc.name}, "name")
-	if not einvoice_name:
-		return
-	try:
-		from erpnext_einvoicing.erpnext_einvoicing.doctype.einvoicing_settings.einvoicing_settings import (
-			get_provider,
-		)
-
-		settings = frappe.get_single("eInvoicing Settings")
-		if not settings.approved_platform:
-			return
-		platform = frappe.get_doc("Approved Platforms", settings.approved_platform)
-		provider = get_provider(settings, platform)
-		einvoice = frappe.get_doc("ePurchase Invoice", einvoice_name)
-		provider.send_lifecycle("205", einvoice)
-	except Exception:
-		frappe.log_error(frappe.get_traceback(), f"eInvoicing lifecycle 205 - PI {doc.name}")
-
-
-def on_purchase_invoice_cancel(doc, method):
-	"""Remet l'ePurchase Invoice en ready quand la PI est annulée."""
-	einvoice = frappe.db.get_value("ePurchase Invoice", {"purchase_invoice": doc.name}, "name")
-	if einvoice:
-		frappe.db.set_value("ePurchase Invoice", einvoice, "conversion_status", "ready")
-		frappe.db.commit()
-		frappe.msgprint(
-			frappe._("ePurchase Invoice {0} has been reset to ready.").format(einvoice),
-			alert=True,
-		)
-
-
-def on_purchase_invoice_trash(doc, method):
-	"""Remet l'ePurchase Invoice en ready quand la PI est supprimée."""
-	einvoice = frappe.db.get_value("ePurchase Invoice", {"purchase_invoice": doc.name}, "name")
-	if einvoice:
-		frappe.db.set_value(
-			"ePurchase Invoice",
-			einvoice,
-			{
-				"purchase_invoice": None,
-				"conversion_status": "ready",
-			},
-		)
-		frappe.db.commit()
-		frappe.msgprint(
-			frappe._("ePurchase Invoice {0} has been reset to ready.").format(einvoice),
-			alert=True,
-		)
