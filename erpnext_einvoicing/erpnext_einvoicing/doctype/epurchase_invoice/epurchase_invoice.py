@@ -12,7 +12,7 @@ class ePurchaseInvoice(Document):
 	### Status
 
 	def _update_conversion_status(self):
-		if self.conversion_status == "converted":
+		if self.conversion_status in ("converted", "refused"):
 			return
 		self.conversion_status = "ready" if self._is_ready_for_conversion() else "pending"
 

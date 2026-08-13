@@ -1,0 +1,48 @@
+{
+  "autoname": "field:reason_code",
+  "creation": "2026-08-12 00:00:00.000000",
+  "doctype": "DocType",
+  "engine": "InnoDB",
+  "field_order": ["reason_code", "reason_label"],
+  "fields": [
+    {
+      "fieldname": "reason_code",
+      "fieldtype": "Data",
+      "label": "Reason Code",
+      "reqd": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "reason_label",
+      "fieldtype": "Data",
+      "label": "Label",
+      "reqd": 1,
+      "in_list_view": 1
+    }
+  ],
+  "modified": "2026-08-12 00:00:00.000000",
+  "modified_by": "Administrator",
+  "module": "ERPNext eInvoicing",
+  "name": "eInvoicing Refusal Reason",
+  "owner": "Administrator",
+  "permissions": [
+    {
+      "create": 1,
+      "delete": 1,
+      "read": 1,
+      "role": "System Manager",
+      "write": 1
+    },
+    {
+      "read": 1,
+      "role": "Accounts Manager"
+    },
+    {
+      "read": 1,
+      "role": "Accounts User"
+    }
+  ],
+  "search_fields": "reason_label,reason_code",
+  "title_field": "reason_label",
+  "track_changes": 0
+}

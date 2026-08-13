@@ -21,7 +21,8 @@ const expanded = ref(new Set());
 /*** Computed ***/
 
 const filtered = computed(() => {
-	if (filter.value === "all") return invoices.value;
+	if (filter.value === "all")
+		return invoices.value.filter((i) => i.conversion_status !== "refused");
 	return invoices.value.filter((inv) => inv.conversion_status === filter.value);
 });
 
@@ -29,6 +30,7 @@ const counts = computed(() => ({
 	pending: invoices.value.filter((i) => i.conversion_status === "pending").length,
 	ready: invoices.value.filter((i) => i.conversion_status === "ready").length,
 	converted: invoices.value.filter((i) => i.conversion_status === "converted").length,
+	refused: invoices.value.filter((i) => i.conversion_status === "refused").length,
 }));
 
 /*** API ***/
@@ -683,6 +685,49 @@ async function cancelConversion(invoice) {
 	);
 }
 
+function promptRefuse(invoice) {
+	frappe.prompt(
+		[
+			{
+				fieldname: "reason_code",
+				fieldtype: "Link",
+				options: "eInvoicing Refusal Reason",
+				label: __("Reason"),
+				reqd: 1,
+			},
+			{
+				fieldname: "reason_comment",
+				fieldtype: "Small Text",
+				label: __("Comment"),
+			},
+		],
+		async (values) => {
+			const r = await frappe.call({
+				method: "erpnext_einvoicing.providers.sync.refuse_invoice",
+				args: {
+					name: invoice.name,
+					reason_code: values.reason_code,
+					reason_comment: values.reason_comment || null,
+				},
+				freeze: true,
+				freeze_message: __("Sending refusal..."),
+			});
+			const msg = r.message || {};
+			if (msg.status === "ok") {
+				frappe.show_alert(
+					{ message: __("Invoice successfully refused"), indicator: "green" },
+					10
+				);
+				await fetchInvoices(true);
+			} else {
+				frappe.msgprint({ message: msg.error || __("Failed"), indicator: "red" });
+			}
+		},
+		__("Refuse Invoice"),
+		__("Confirm Refusal")
+	);
+}
+
 /*** UI helpers ***/
 
 function supplierReady(invoice) {
@@ -735,7 +780,7 @@ onMounted(async () => {
 		>
 			<div class="btn-group">
 				<button
-					v-for="tab in ['all', 'pending', 'ready', 'converted']"
+					v-for="tab in ['all', 'pending', 'ready', 'converted', 'refused']"
 					:key="tab"
 					:class="['btn btn-sm', filter === tab ? 'btn-primary' : 'btn-default']"
 					@click="filter = tab"
@@ -837,9 +882,12 @@ onMounted(async () => {
 						</span>
 						<span
 							:class="`indicator-pill ${
-								{ pending: 'orange', ready: 'green', converted: 'blue' }[
-									invoice.conversion_status
-								] || 'grey'
+								{
+									pending: 'orange',
+									ready: 'green',
+									converted: 'blue',
+									refused: 'red',
+								}[invoice.conversion_status] || 'grey'
 							}`"
 						>
 							{{ __(invoice.conversion_status) }}
@@ -1188,33 +1236,44 @@ onMounted(async () => {
 					</div>
 				</div>
 
-				<!-- Card footer -->
+				<!-- Footer: pending ou ready -->
 				<div
-					v-if="canConvert(invoice)"
-					style="padding: 10px 16px; border-top: 1px solid #f0f0f0; text-align: right"
-				>
-					<button class="btn btn-sm btn-primary" @click="convertToPI(invoice)">
-						{{ __("Convert to Purchase Invoice") }}
-						<i class="fa fa-arrow-circle-o-right"></i>
-					</button>
-				</div>
-				<div
-					v-else-if="invoice.conversion_status === 'ready'"
+					v-if="['pending', 'ready'].includes(invoice.conversion_status)"
 					style="
 						padding: 10px 16px;
 						border-top: 1px solid #f0f0f0;
-						text-align: right;
-						color: #888;
-						font-size: 12px;
+						display: flex;
+						justify-content: space-between;
+						align-items: center;
 					"
 				>
-					<i class="fa fa-exclamation-triangle"></i>
-					{{
-						buyingSettings.pr_required && !invoice.purchase_receipt
-							? __("Purchase Receipt required")
-							: __("Purchase Order required")
-					}}
+					<button class="btn btn-sm btn-danger" @click="promptRefuse(invoice)">
+						<i class="fa fa-ban"></i> {{ __("Refuse") }}
+					</button>
+					<div>
+						<span
+							v-if="!canConvert(invoice) && invoice.conversion_status === 'ready'"
+							style="color: #888; font-size: 12px; margin-right: 8px"
+						>
+							<i class="fa fa-exclamation-triangle"></i>
+							{{
+								buyingSettings.pr_required && !invoice.purchase_receipt
+									? __("Purchase Receipt required")
+									: __("Purchase Order required")
+							}}
+						</span>
+						<button
+							v-if="canConvert(invoice)"
+							class="btn btn-sm btn-primary"
+							@click="convertToPI(invoice)"
+						>
+							{{ __("Convert to Purchase Invoice") }}
+							<i class="fa fa-arrow-circle-o-right"></i>
+						</button>
+					</div>
 				</div>
+
+				<!-- Footer: converted -->
 				<div
 					v-if="invoice.conversion_status === 'converted'"
 					style="padding: 10px 16px; border-top: 1px solid #f0f0f0; text-align: right"
@@ -1230,6 +1289,14 @@ onMounted(async () => {
 					<button class="btn btn-xs btn-danger ml-1" @click="cancelConversion(invoice)">
 						<i class="fa fa-undo"></i> {{ __("Reset") }}
 					</button>
+				</div>
+
+				<!-- Footer: refused -->
+				<div
+					v-if="invoice.conversion_status === 'refused'"
+					style="padding: 10px 16px; border-top: 1px solid #f0f0f0; text-align: right"
+				>
+					<span class="indicator-pill red">{{ __("Refused") }}</span>
 				</div>
 			</div>
 		</div>

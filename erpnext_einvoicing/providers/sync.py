@@ -108,7 +108,7 @@ def link_purchase_receipt(name, purchase_receipt):
 def get_einvoicing_inbox():
 	invoices = frappe.get_all(
 		"ePurchase Invoice",
-		filters={"conversion_status": ["in", ["pending", "ready", "converted"]]},
+		filters={"conversion_status": ["in", ["pending", "ready", "converted", "refused"]]},
 		fields=[
 			"name",
 			"conversion_status",
@@ -863,6 +863,36 @@ def cancel_conversion(name):
 	frappe.delete_doc("Purchase Invoice", pi_name, ignore_permissions=True)
 	frappe.db.commit()
 
+	return {"status": "ok"}
+
+
+@frappe.whitelist()
+def get_refusal_reasons():
+	return frappe.get_all(
+		"eInvoicing Refusal Reason",
+		fields=["reason_code", "reason_label"],
+		order_by="reason_code asc",
+	)
+
+
+@frappe.whitelist()
+def refuse_invoice(name, reason_code, reason_comment=None):
+	doc = frappe.get_doc("ePurchase Invoice", name)
+	if doc.conversion_status in ("converted", "refused"):
+		frappe.throw(frappe._("Cannot refuse this invoice."))
+
+	refusal_reasons = [{"MDT-113": reason_code}]
+	if reason_comment:
+		refusal_reasons[0]["MDT-126"] = reason_comment
+
+	try:
+		_get_provider().send_lifecycle("210", doc, refusal_reasons)
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), f"eInvoicing lifecycle 210 — {name}")
+		frappe.throw(frappe._("Failed to send refusal to platform."))
+
+	frappe.db.set_value("ePurchase Invoice", name, "conversion_status", "refused")
+	frappe.db.commit()
 	return {"status": "ok"}
 
 

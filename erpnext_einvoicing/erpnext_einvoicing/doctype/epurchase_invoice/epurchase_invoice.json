@@ -55,7 +55,7 @@
    "fieldname": "conversion_status",
    "fieldtype": "Select",
    "label": "Status",
-   "options": "pending\nready\nconverted",
+   "options": "pending\nready\nconverted\nrefused",
    "reqd": 1,
    "in_list_view": 1
   },
@@ -328,6 +328,10 @@
   {
    "color": "Blue",
    "title": "converted"
+  },
+  {
+   "color": "Red",
+   "title": "refused"
   }
  ],
  "title_field": "supplier_name_raw",

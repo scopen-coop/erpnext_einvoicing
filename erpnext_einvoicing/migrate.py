@@ -6,6 +6,7 @@ import frappe
 
 def after_migrate():
 	_create_uom_mappings()
+	_insert_refusal_reasons()
 
 
 ### Private
@@ -37,4 +38,31 @@ def _create_uom_mappings():
 		doc.erpnext_uom = erpnext_uom
 		doc.insert(ignore_permissions=True)
 
+	frappe.db.commit()
+
+
+REFUSAL_REASONS = [
+	{"reason_code": "TX_TVA_ERR", "reason_label": "Taux de TVA erroné"},
+	{"reason_code": "MONTANTTOTAL_ERR", "reason_label": "Montant total erroné"},
+	{"reason_code": "CALCUL_ERR", "reason_label": "Erreur de calcul"},
+	{"reason_code": "NON_CONFORME", "reason_label": "Non conforme"},
+	{"reason_code": "DOUBLON", "reason_label": "Doublon"},
+	{"reason_code": "DEST_ERR", "reason_label": "Destinataire erroné"},
+	{"reason_code": "TRANSAC_INC", "reason_label": "Transaction incomplète"},
+	{"reason_code": "EMMET_INC", "reason_label": "Émetteur incorrect"},
+	{"reason_code": "CONTRAT_TERM", "reason_label": "Contrat terminé"},
+	{"reason_code": "DOUBLE_FACT", "reason_label": "Double facturation"},
+	{"reason_code": "CMD_ERR", "reason_label": "Commande erronée"},
+	{"reason_code": "ADR_ERR", "reason_label": "Adresse erronée"},
+	{"reason_code": "REF_CT_ABSENT", "reason_label": "Référence contrat absente"},
+]
+
+
+def _insert_refusal_reasons():
+	for r in REFUSAL_REASONS:
+		if not frappe.db.exists("eInvoicing Refusal Reason", r["reason_code"]):
+			doc = frappe.new_doc("eInvoicing Refusal Reason")
+			doc.reason_code = r["reason_code"]
+			doc.reason_label = r["reason_label"]
+			doc.insert(ignore_permissions=True)
 	frappe.db.commit()
