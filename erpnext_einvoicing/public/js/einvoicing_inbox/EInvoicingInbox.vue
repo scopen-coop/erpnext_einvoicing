@@ -731,8 +731,18 @@ async function createItem(invoice, item) {
 
 function canConvert(invoice) {
 	if (invoice.conversion_status !== "ready") return false;
-	if (buyingSettings.value.po_required && !invoice.purchase_order) return false;
-	if (buyingSettings.value.pr_required && !invoice.purchase_receipt) return false;
+	if (buyingSettings.value.po_required) {
+		const hasPO =
+			invoice.purchase_order ||
+			invoice.items?.some((i) => i.purchase_order && i.match_status === "matched");
+		if (!hasPO) return false;
+	}
+	if (buyingSettings.value.pr_required) {
+		const hasPR =
+			invoice.purchase_receipt ||
+			invoice.items?.some((i) => i.purchase_receipt && i.match_status === "matched");
+		if (!hasPR) return false;
+	}
 	return true;
 }
 
@@ -753,6 +763,35 @@ async function convertToPI(invoice) {
 				5
 			);
 			await fetchInvoices(true);
+		}
+	});
+}
+
+async function convertAll() {
+	const readyNames = filtered.value
+		.filter((i) => i.conversion_status === "ready")
+		.map((i) => i.name);
+
+	frappe.confirm(__("Convert all {0} ready invoice(s)?", [readyNames.length]), async () => {
+		syncing.value = true;
+		try {
+			const r = await frappe.call({
+				method: "erpnext_einvoicing.providers.sync.convert_all_ready",
+				args: { names: JSON.stringify(readyNames) },
+				freeze: true,
+				freeze_message: __("Converting..."),
+			});
+			const msg = r.message || {};
+			frappe.show_alert(
+				{
+					message: msg.message,
+					indicator: msg.status === "ok" ? "green" : "orange",
+				},
+				5
+			);
+			await fetchInvoices(true);
+		} finally {
+			syncing.value = false;
 		}
 	});
 }
@@ -1183,6 +1222,7 @@ async function refreshLifecycleLog(invoice) {
 			</div>
 			<div>
 				<button
+					v-if="filter === 'pending'"
 					class="btn btn-sm btn-default"
 					style="margin-right: 10px"
 					:disabled="syncing"
@@ -1191,6 +1231,15 @@ async function refreshLifecycleLog(invoice) {
 				>
 					<i class="fa fa-magic"></i>
 					{{ __("Re-match All") }}
+				</button>
+				<button
+					v-if="filter === 'ready' && counts.ready > 0"
+					class="btn btn-sm btn-primary"
+					style="margin-right: 10px"
+					:disabled="syncing"
+					@click="convertAll"
+				>
+					<i class="fa fa-arrow-circle-o-right"></i> {{ __("Convert All") }}
 				</button>
 				<button
 					class="btn btn-sm btn-default position-relative"
@@ -1245,7 +1294,7 @@ async function refreshLifecycleLog(invoice) {
 		</div>
 
 		<!-- Invoice list -->
-		<div v-else>
+		<TransitionGroup v-else name="invoice-fade" tag="div">
 			<div
 				v-for="invoice in filtered"
 				:key="invoice.name"
@@ -1534,7 +1583,7 @@ async function refreshLifecycleLog(invoice) {
 				</div>
 
 				<!-- Items section -->
-				<div style="padding: 0">
+				<div style="padding: 0; background: #fbfbfb; border-left: 2px solid #5bc0de">
 					<div
 						style="
 							display: flex;
@@ -1675,7 +1724,20 @@ async function refreshLifecycleLog(invoice) {
 											></i>
 										</template>
 										<template v-else-if="item.po_match_status === 'ambiguous'">
+											<template v-if="invoice.purchase_order">
+												<a
+													:href="`/app/purchase-order/${invoice.purchase_order}`"
+													target="_blank"
+													style="color: #666; font-size: 11px"
+												>
+													{{ invoice.purchase_order }}
+												</a>
+												<span style="color: #aaa; font-size: 10px">{{
+													__("(header)")
+												}}</span>
+											</template>
 											<button
+												v-else
 												class="btn btn-xs btn-warning"
 												style="font-size: 10px; padding: 1px 6px"
 												@click.stop="promptSelectPO(invoice, item)"
@@ -1684,9 +1746,9 @@ async function refreshLifecycleLog(invoice) {
 											</button>
 										</template>
 										<template v-else>
-											<span style="color: #ccc; font-size: 11px">{{
-												__("No PO")
-											}}</span>
+											<span style="color: #ccc; font-size: 11px">
+												{{ __("No PO") }}
+											</span>
 											<button
 												v-if="item.match_status === 'matched'"
 												class="btn btn-xs btn-default"
@@ -1749,7 +1811,20 @@ async function refreshLifecycleLog(invoice) {
 											></i>
 										</template>
 										<template v-else-if="item.pr_match_status === 'ambiguous'">
+											<template v-if="invoice.purchase_receipt">
+												<a
+													:href="`/app/purchase-receipt/${invoice.purchase_receipt}`"
+													target="_blank"
+													style="color: #666; font-size: 11px"
+												>
+													{{ invoice.purchase_receipt }}
+												</a>
+												<span style="color: #aaa; font-size: 10px">{{
+													__("(header)")
+												}}</span>
+											</template>
 											<button
+												v-else
 												class="btn btn-xs btn-warning"
 												style="font-size: 10px; padding: 1px 6px"
 												@click.stop="promptSelectPR(invoice, item)"
@@ -1758,9 +1833,9 @@ async function refreshLifecycleLog(invoice) {
 											</button>
 										</template>
 										<template v-else>
-											<span style="color: #ccc; font-size: 11px">{{
-												__("No PR")
-											}}</span>
+											<span style="color: #ccc; font-size: 11px">
+												{{ __("No PR") }}
+											</span>
 											<button
 												v-if="item.match_status === 'matched'"
 												class="btn btn-xs btn-default"
@@ -1800,7 +1875,8 @@ async function refreshLifecycleLog(invoice) {
 									<span
 										@click="confirmDeleteMatchedItem(invoice, item)"
 										style="cursor: pointer"
-										><i
+									>
+										<i
 											class="fa fa-times"
 											style="color: #c11d1d"
 											aria-hidden="true"
@@ -1873,9 +1949,11 @@ async function refreshLifecycleLog(invoice) {
 						>
 							<i class="fa fa-exclamation-triangle"></i>
 							{{
-								buyingSettings.pr_required && !invoice.purchase_receipt
-									? __("Purchase Receipt required")
-									: __("Purchase Order required")
+								buyingSettings.po_required &&
+								!invoice.purchase_order &&
+								!invoice.items?.some((i) => i.purchase_order)
+									? __("Purchase Order required")
+									: __("Purchase Receipt required")
 							}}
 						</span>
 						<button
@@ -1915,6 +1993,24 @@ async function refreshLifecycleLog(invoice) {
 					<span class="indicator-pill red">{{ __("Refused") }}</span>
 				</div>
 			</div>
-		</div>
+		</TransitionGroup>
 	</div>
 </template>
+<style>
+.invoice-fade-move,
+.invoice-fade-enter-active,
+.invoice-fade-leave-active {
+	transition: all 0.4s ease;
+}
+
+.invoice-fade-enter-from,
+.invoice-fade-leave-to {
+	opacity: 0;
+	transform: translateX(20px);
+}
+
+.invoice-fade-leave-active {
+	position: absolute;
+	width: calc(100% - 32px);
+}
+</style>

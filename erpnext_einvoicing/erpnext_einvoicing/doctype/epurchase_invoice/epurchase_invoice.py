@@ -26,11 +26,15 @@ class ePurchaseInvoice(Document):
 				return False
 		settings = frappe.get_single("eInvoicing Settings")
 		if settings.po_required:
-			has_po = any(item.purchase_order for item in self.items if item.match_status == "matched")
+			has_po = bool(self.purchase_order) or any(
+				item.purchase_order for item in self.items if item.match_status == "matched"
+			)
 			if not has_po:
 				return False
 		if settings.pr_required:
-			has_pr = any(item.purchase_receipt for item in self.items if item.match_status == "matched")
+			has_pr = bool(self.purchase_receipt) or any(
+				item.purchase_receipt for item in self.items if item.match_status == "matched"
+			)
 			if not has_pr:
 				return False
 		return True

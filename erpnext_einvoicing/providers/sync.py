@@ -113,11 +113,11 @@ def link_purchase_order(name, purchase_order):
 			continue
 		billed_qty = frappe.db.sql(
 			"""
-                                   SELECT COALESCE(SUM(qty), 0)
-                                   FROM `tabPurchase Invoice Item`
-                                   WHERE po_detail = %s
-                                     AND docstatus = 1
-		                           """,
+            SELECT COALESCE(SUM(qty), 0)
+            FROM `tabPurchase Invoice Item`
+            WHERE po_detail = %s
+              AND docstatus = 1
+			""",
 			po_line.name,
 		)[0][0]
 		remaining = po_line.qty - billed_qty
@@ -172,11 +172,11 @@ def link_purchase_receipt(name, purchase_receipt):
 			continue
 		billed_qty = frappe.db.sql(
 			"""
-                                   SELECT COALESCE(SUM(qty), 0)
-                                   FROM `tabPurchase Invoice Item`
-                                   WHERE pr_detail = %s
-                                     AND docstatus = 1
-		                           """,
+            SELECT COALESCE(SUM(qty), 0)
+            FROM `tabPurchase Invoice Item`
+            WHERE pr_detail = %s
+              AND docstatus = 1
+			""",
 			pr_line.name,
 		)[0][0]
 		remaining = pr_line.qty - billed_qty
@@ -519,7 +519,7 @@ def rematch_supplier(name):
 def _rematch_all_pending():
 	invoices = frappe.get_all(
 		"ePurchase Invoice",
-		filters={"conversion_status": ["in", ["pending", "ready"]]},
+		filters={"conversion_status": ["in", ["pending"]]},
 		pluck="name",
 	)
 	for name in invoices:
@@ -1005,6 +1005,36 @@ def convert_to_purchase_invoice(name):
 
 
 @frappe.whitelist()
+def convert_all_ready(names):
+	import json
+
+	if isinstance(names, str):
+		names = json.loads(names)
+
+	converted = 0
+	errors = []
+
+	for name in names:
+		try:
+			doc = frappe.get_doc("ePurchase Invoice", name)
+			if doc.conversion_status != "ready":
+				continue
+			doc.convert_to_purchase_invoice()
+			converted += 1
+		except Exception:
+			frappe.log_error(frappe.get_traceback(), f"eInvoicing convert all - {name}")
+			errors.append(name)
+
+	frappe.db.commit()
+	return {
+		"status": "ok" if not errors else "partial",
+		"message": frappe._("{0} converted, {1} errors.").format(converted, len(errors)),
+		"converted": converted,
+		"errors": errors,
+	}
+
+
+@frappe.whitelist()
 def cancel_conversion(name):
 	doc = frappe.get_doc("ePurchase Invoice", name)
 	if not doc.purchase_invoice:
@@ -1059,7 +1089,7 @@ def refuse_invoice(name, reason_code, reason_comment=None):
 	try:
 		_get_provider().send_lifecycle("210", doc, refusal_reasons)
 	except Exception:
-		frappe.log_error(frappe.get_traceback(), f"eInvoicing lifecycle 210 — {name}")
+		frappe.log_error(frappe.get_traceback(), f"eInvoicing lifecycle 210 - {name}")
 		frappe.throw(frappe._("Failed to send refusal to platform."))
 
 	frappe.db.set_value("ePurchase Invoice", name, "conversion_status", "refused")
@@ -1135,7 +1165,7 @@ def _poll_one_lifecycle_log(provider, log):
 			)
 		frappe.db.commit()
 	except Exception:
-		frappe.log_error(frappe.get_traceback(), f"eInvoicing lifecycle poll — {log.name}")
+		frappe.log_error(frappe.get_traceback(), f"eInvoicing lifecycle poll - {log.name}")
 
 
 @frappe.whitelist()
@@ -1193,11 +1223,11 @@ def get_po_candidates(name, item_idx):
 	for l in lines:
 		billed_qty = frappe.db.sql(
 			"""
-                                   SELECT COALESCE(SUM(qty), 0)
-                                   FROM `tabPurchase Invoice Item`
-                                   WHERE po_detail = %s
-                                     AND docstatus = 1
-		                           """,
+            SELECT COALESCE(SUM(qty), 0)
+            FROM `tabPurchase Invoice Item`
+            WHERE po_detail = %s
+              AND docstatus = 1
+			""",
 			l.name,
 		)[0][0]
 		remaining_qty = round(l.qty - billed_qty, 3)
@@ -1243,11 +1273,11 @@ def get_pr_candidates(name, item_idx):
 	for l in lines:
 		billed_qty = frappe.db.sql(
 			"""
-                                   SELECT COALESCE(SUM(qty), 0)
-                                   FROM `tabPurchase Invoice Item`
-                                   WHERE pr_detail = %s
-                                     AND docstatus = 1
-		                           """,
+            SELECT COALESCE(SUM(qty), 0)
+            FROM `tabPurchase Invoice Item`
+            WHERE pr_detail = %s
+              AND docstatus = 1
+			""",
 			l.name,
 		)[0][0]
 		remaining_qty = round(l.qty - billed_qty, 3)
@@ -1273,11 +1303,11 @@ def match_item_po(name, item_idx, purchase_order, po_detail):
 			po_qty = frappe.db.get_value("Purchase Order Item", po_detail, "qty")
 			billed_qty = frappe.db.sql(
 				"""
-                                       SELECT COALESCE(SUM(qty), 0)
-                                       FROM `tabPurchase Invoice Item`
-                                       WHERE po_detail = %s
-                                         AND docstatus = 1
-			                           """,
+                SELECT COALESCE(SUM(qty), 0)
+                FROM `tabPurchase Invoice Item`
+                WHERE po_detail = %s
+                  AND docstatus = 1
+				""",
 				po_detail,
 			)[0][0]
 			remaining = po_qty - billed_qty
@@ -1302,11 +1332,11 @@ def match_item_pr(name, item_idx, purchase_receipt, pr_detail):
 			pr_qty = frappe.db.get_value("Purchase Receipt Item", pr_detail, "qty")
 			billed_qty = frappe.db.sql(
 				"""
-                                       SELECT COALESCE(SUM(qty), 0)
-                                       FROM `tabPurchase Invoice Item`
-                                       WHERE pr_detail = %s
-                                         AND docstatus = 1
-			                           """,
+                SELECT COALESCE(SUM(qty), 0)
+                FROM `tabPurchase Invoice Item`
+                WHERE pr_detail = %s
+                  AND docstatus = 1
+				""",
 				pr_detail,
 			)[0][0]
 			remaining = pr_qty - billed_qty
