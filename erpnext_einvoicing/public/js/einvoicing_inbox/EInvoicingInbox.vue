@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, nextTick } from "vue";
+import { ref, computed, onMounted, watch, nextTick } from "vue";
 
 // Helper pour traduction
 function __(text, replace) {
@@ -18,6 +18,13 @@ const syncing = ref(false);
 const filter = ref("pending");
 const expanded = ref(new Set());
 
+const switchingTab = ref(false);
+watch(filter, () => {
+	switchingTab.value = true;
+	nextTick(() => {
+		switchingTab.value = false;
+	});
+});
 /*** Computed ***/
 
 const filtered = computed(() => {
@@ -1294,7 +1301,12 @@ async function refreshLifecycleLog(invoice) {
 		</div>
 
 		<!-- Invoice list -->
-		<TransitionGroup v-else name="invoice-fade" tag="div">
+		<TransitionGroup
+			v-else
+			:name="switchingTab ? '' : 'invoice-fade'"
+			tag="div"
+			style="position: relative"
+		>
 			<div
 				v-for="invoice in filtered"
 				:key="invoice.name"
@@ -2000,13 +2012,13 @@ async function refreshLifecycleLog(invoice) {
 .invoice-fade-move,
 .invoice-fade-enter-active,
 .invoice-fade-leave-active {
-	transition: all 0.4s ease;
+	transition: all 1s ease;
 }
 
 .invoice-fade-enter-from,
 .invoice-fade-leave-to {
 	opacity: 0;
-	transform: translateX(20px);
+	transform: translateX(3000px);
 }
 
 .invoice-fade-leave-active {
