@@ -16,13 +16,22 @@ class ePurchaseInvoice(Document):
 			return
 		self.conversion_status = "ready" if self._is_ready_for_conversion() else "pending"
 
-	def _is_ready_for_conversion(self) -> bool:
+	def _is_ready_for_conversion(self):
 		if not self._supplier_ready():
 			return False
 		for item in self.items:
 			if item.match_status not in ("matched", "created"):
 				return False
 			if not item.matched_item:
+				return False
+		settings = frappe.get_single("eInvoicing Settings")
+		if settings.po_required:
+			has_po = any(item.purchase_order for item in self.items if item.match_status == "matched")
+			if not has_po:
+				return False
+		if settings.pr_required:
+			has_pr = any(item.purchase_receipt for item in self.items if item.match_status == "matched")
+			if not has_pr:
 				return False
 		return True
 

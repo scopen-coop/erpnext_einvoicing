@@ -35,7 +35,7 @@ const counts = computed(() => ({
 
 /*** Date picker ***/
 const showDatePicker = ref(false);
-const datePreset = ref("30");
+const datePreset = ref("all");
 const dateFrom = ref("");
 const dateTo = ref("");
 const pendingPreset = ref("30");
@@ -215,6 +215,22 @@ function promptMatchSupplier(invoice) {
 		__("Match Supplier"),
 		__("Confirm")
 	);
+}
+
+async function rematchAll() {
+	syncing.value = true;
+	try {
+		const r = await frappe.call({
+			method: "erpnext_einvoicing.providers.sync.rematch_all",
+			freeze: true,
+			freeze_message: __("Re-matching..."),
+		});
+		const msg = r.message || {};
+		frappe.show_alert({ message: msg.message, indicator: "green" }, 4);
+		await fetchInvoices(true);
+	} finally {
+		syncing.value = false;
+	}
 }
 
 async function rematchSupplier(invoice) {
@@ -481,7 +497,7 @@ function promptLinkPO(invoice) {
 				get_query: () => ({
 					filters: {
 						supplier: invoice.matched_supplier,
-						status: ["in", ["To Bill", "Partially Billed"]],
+						status: ["in", ["To Receive and Bill", "Partially Billed"]],
 					},
 				}),
 			},
@@ -496,6 +512,14 @@ function promptLinkPO(invoice) {
 		__("Link Purchase Order"),
 		__("Confirm")
 	);
+}
+
+async function unlinkPO(invoice) {
+	await frappe.call({
+		method: "erpnext_einvoicing.providers.sync.unlink_purchase_order",
+		args: { name: invoice.name },
+	});
+	await fetchInvoices(true);
 }
 
 function promptLinkPR(invoice) {
@@ -525,6 +549,14 @@ function promptLinkPR(invoice) {
 		__("Link Purchase Receipt"),
 		__("Confirm")
 	);
+}
+
+async function unlinkPR(invoice) {
+	await frappe.call({
+		method: "erpnext_einvoicing.providers.sync.unlink_purchase_receipt",
+		args: { name: invoice.name },
+	});
+	await fetchInvoices(true);
 }
 
 function promptMatchItem(invoice, item) {
@@ -814,6 +846,135 @@ function formatDate(dateStr) {
 	return frappe.datetime.str_to_user(dateStr);
 }
 
+function poStatusIcon(status) {
+	if (status === "matched") return { icon: "fa fa-check-circle", color: "#5cb85c" };
+	if (status === "partial") return { icon: "fa fa-info-circle", color: "#5bc0de" };
+	if (status === "ambiguous") return { icon: "fa fa-exclamation-triangle", color: "#f0ad4e" };
+	return { icon: "fa fa-circle-o", color: "#ddd" };
+}
+
+async function promptSelectPO(invoice, item) {
+	const r = await frappe.call({
+		method: "erpnext_einvoicing.providers.sync.get_po_candidates",
+		args: { name: invoice.name, item_idx: item.idx },
+	});
+	const candidates = r.message || [];
+	if (!candidates.length) {
+		frappe.show_alert(
+			{ message: __("No Purchase Order found for this item"), indicator: "orange" },
+			4
+		);
+		return;
+	}
+	const d = new frappe.ui.Dialog({
+		title: __("Select Purchase Order Line"),
+		fields: candidates.map((c, i) => ({
+			fieldname: `po_${i}`,
+			fieldtype: "HTML",
+			options: `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border:1px solid #f0f0f0;border-radius:4px;margin-bottom:6px;cursor:pointer"
+                data-idx="${i}"
+                onclick="this.closest('.modal-body').querySelectorAll('[data-idx]').forEach(el=>el.style.background='');this.style.background='#e8f4f0';window._selectedPOIdx=${i}">
+                <span style="font-weight:500">${c.parent}</span>
+                <span style="color:#888;font-size:12px">${c.item_name}</span>
+                <span style="color:#333;font-size:12px">${__("Remaining")}: <b>${
+				c.remaining_qty
+			}</b></span>
+            </div>`,
+		})),
+		primary_action_label: __("Link"),
+		primary_action: async () => {
+			const idx = window._selectedPOIdx;
+			if (idx === undefined || idx === null) {
+				frappe.show_alert({ message: __("Please select a line"), indicator: "orange" }, 3);
+				return;
+			}
+			const selected = candidates[idx];
+			await frappe.call({
+				method: "erpnext_einvoicing.providers.sync.match_item_po",
+				args: {
+					name: invoice.name,
+					item_idx: item.idx,
+					purchase_order: selected.parent,
+					po_detail: selected.name,
+				},
+			});
+			d.hide();
+			window._selectedPOIdx = null;
+			await fetchInvoices(true);
+		},
+	});
+	d.show();
+}
+
+async function promptSelectPR(invoice, item) {
+	const r = await frappe.call({
+		method: "erpnext_einvoicing.providers.sync.get_pr_candidates",
+		args: { name: invoice.name, item_idx: item.idx },
+	});
+	const candidates = r.message || [];
+	if (!candidates.length) {
+		frappe.show_alert(
+			{ message: __("No Purchase Receipt found for this item"), indicator: "orange" },
+			4
+		);
+		return;
+	}
+	const d = new frappe.ui.Dialog({
+		title: __("Select Purchase Receipt Line"),
+		fields: candidates.map((c, i) => ({
+			fieldname: `pr_${i}`,
+			fieldtype: "HTML",
+			options: `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border:1px solid #f0f0f0;border-radius:4px;margin-bottom:6px;cursor:pointer"
+                data-idx="${i}"
+                onclick="this.closest('.modal-body').querySelectorAll('[data-idx]').forEach(el=>el.style.background='');this.style.background='#e8f4f0';window._selectedPRIdx=${i}">
+                <span style="font-weight:500">${c.parent}</span>
+                <span style="color:#888;font-size:12px">${c.item_name}</span>
+                <span style="color:#333;font-size:12px">${__("Remaining")}: <b>${
+				c.remaining_qty
+			}</b></span>
+            </div>`,
+		})),
+		primary_action_label: __("Link"),
+		primary_action: async () => {
+			const idx = window._selectedPRIdx;
+			if (idx === undefined || idx === null) {
+				frappe.show_alert({ message: __("Please select a line"), indicator: "orange" }, 3);
+				return;
+			}
+			const selected = candidates[idx];
+			await frappe.call({
+				method: "erpnext_einvoicing.providers.sync.match_item_pr",
+				args: {
+					name: invoice.name,
+					item_idx: item.idx,
+					purchase_receipt: selected.parent,
+					pr_detail: selected.name,
+				},
+			});
+			d.hide();
+			window._selectedPRIdx = null;
+			await fetchInvoices(true);
+		},
+	});
+	d.show();
+}
+
+async function unlinkItemPO(invoice, item) {
+	await frappe.call({
+		method: "erpnext_einvoicing.providers.sync.unlink_item_po",
+		args: { name: invoice.name, item_idx: item.idx },
+	});
+	await fetchInvoices(true);
+}
+
+async function unlinkItemPR(invoice, item) {
+	await frappe.call({
+		method: "erpnext_einvoicing.providers.sync.unlink_item_pr",
+		args: { name: invoice.name, item_idx: item.idx },
+	});
+	await fetchInvoices(true);
+}
+
 /*** Lifecycle ***/
 const buyingSettings = ref({ po_required: false, pr_required: false });
 onMounted(async () => {
@@ -1020,34 +1181,53 @@ async function refreshLifecycleLog(invoice) {
 					@click="closeDatePicker"
 				></div>
 			</div>
-			<button
-				class="btn btn-sm btn-default position-relative"
-				style="margin-right: 20px"
-				:disabled="syncing"
-				@click="syncFlows"
-			>
-				<i :class="['fa', syncing ? 'fa-spinner fa-spin' : 'fa-refresh']"></i>
-				{{ __("Sync") }}
-				<span
-					v-if="pendingFlowsStatus === 'pending'"
-					class="position-absolute badge rounded-pill bg-warning"
-					style="font-size: 10px; top: -8px; left: 85%"
+			<div>
+				<button
+					class="btn btn-sm btn-default"
+					style="margin-right: 10px"
+					:disabled="syncing"
+					@click="rematchAll"
+					:title="__('Re-match all pending invoices')"
 				>
-					{{ pendingFlows }}
-				</span>
-				<span
-					v-else-if="pendingFlowsStatus === 'ok'"
-					class="position-absolute rounded-circle bg-success"
-					style="width: 8px; height: 8px; top: -3px; left: 90%"
+					<i class="fa fa-magic"></i>
+					{{ __("Re-match All") }}
+				</button>
+				<button
+					class="btn btn-sm btn-default position-relative"
+					style="margin-right: 20px"
+					:disabled="syncing"
+					@click="syncFlows"
+					:title="
+						pendingFlowsStatus === 'pending'
+							? __('Invoices Pending')
+							: pendingFlowsStatus === 'ok'
+							? __('Synched')
+							: __('Provider Error')
+					"
 				>
-				</span>
-				<span
-					v-else-if="pendingFlowsStatus === 'error'"
-					class="position-absolute rounded-circle bg-danger"
-					style="width: 8px; height: 8px; top: -3px; left: 90%"
-				>
-				</span>
-			</button>
+					<i :class="['fa', syncing ? 'fa-spinner fa-spin' : 'fa-refresh']"></i>
+					{{ __("Sync") }}
+					<span
+						v-if="pendingFlowsStatus === 'pending'"
+						class="position-absolute badge rounded-pill bg-warning"
+						style="font-size: 10px; top: -8px; left: 85%"
+					>
+						{{ pendingFlows }}
+					</span>
+					<span
+						v-else-if="pendingFlowsStatus === 'ok'"
+						class="position-absolute rounded-circle bg-success"
+						style="width: 8px; height: 8px; top: -3px; left: 90%"
+					>
+					</span>
+					<span
+						v-else-if="pendingFlowsStatus === 'error'"
+						class="position-absolute rounded-circle bg-danger"
+						style="width: 8px; height: 8px; top: -3px; left: 90%"
+					>
+					</span>
+				</button>
+			</div>
 		</div>
 
 		<!-- Loading -->
@@ -1321,6 +1501,7 @@ async function refreshLifecycleLog(invoice) {
 								v-else
 								class="btn btn-xs btn-default"
 								@click="promptLinkPO(invoice)"
+								:disabled="!invoice.matched_supplier"
 							>
 								<i class="fa fa-link"></i> {{ __("Link PO") }}
 							</button>
@@ -1397,34 +1578,205 @@ async function refreshLifecycleLog(invoice) {
 							"
 						>
 							<div style="flex: 1">
-								<span style="font-weight: 500">{{
-									item.item_description_raw
-								}}</span>
-								<span
-									v-if="item.item_ref_raw"
-									style="color: #888; margin-left: 8px; font-size: 12px"
+								<!-- Ligne principale -->
+								<div
+									style="
+										display: flex;
+										align-items: center;
+										flex-wrap: wrap;
+										gap: 4px;
+									"
 								>
-									{{ item.item_ref_raw }}
-								</span>
-								<span style="color: #666; margin-left: 8px; font-size: 12px">
-									{{ item.qty }} ×
-									{{ formatCurrency(item.unit_price, invoice.currency) }}
-								</span>
-								<span style="font-size: 11px; color: #aaa; margin-left: 16px">
-									<span v-if="item.tax_account_name">
-										{{ item.tax_account_name }}
-										<span style="opacity: 0.6">({{ item.tax_rate }}%)</span>
+									<span style="font-weight: 500">{{
+										item.item_description_raw
+									}}</span>
+									<span
+										v-if="item.item_ref_raw"
+										style="color: #888; font-size: 12px"
+									>
+										- {{ item.item_ref_raw }} -
 									</span>
-									<span v-else-if="item.tax_rate">
-										TVA {{ item.tax_rate }}%
+									<span style="color: #666; font-size: 12px">
+										{{ item.qty }} ×
+										{{ formatCurrency(item.unit_price, invoice.currency) }}
 									</span>
-									<span v-else>{{ __("No tax") }}</span>
-									<i
-										class="fa fa-pencil"
-										style="cursor: pointer; margin-left: 6px"
-										@click="editItemTaxRate(invoice, item)"
-									></i>
-								</span>
+									<span style="font-size: 11px; color: #aaa; margin-left: 8px">
+										<span v-if="item.tax_account_name">
+											{{ item.tax_account_name }}
+											<span style="opacity: 0.6"
+												>({{ item.tax_rate }}%)</span
+											>
+										</span>
+										<span v-else-if="item.tax_rate"
+											>TVA {{ item.tax_rate }}%</span
+										>
+										<span v-else>{{ __("No tax") }}</span>
+										<i
+											class="fa fa-pencil"
+											style="cursor: pointer; margin-left: 6px"
+											@click="editItemTaxRate(invoice, item)"
+										></i>
+									</span>
+								</div>
+
+								<!-- Ligne PO/PR — uniquement si item matché -->
+								<div
+									v-if="item.match_status === 'matched'"
+									style="
+										display: flex;
+										align-items: center;
+										gap: 16px;
+										margin-top: 4px;
+									"
+								>
+									<!-- PO -->
+									<span
+										style="
+											display: flex;
+											align-items: center;
+											gap: 4px;
+											font-size: 11px;
+										"
+									>
+										<i
+											:class="poStatusIcon(item.po_match_status).icon"
+											:style="`color: ${
+												poStatusIcon(item.po_match_status).color
+											}; font-size: 11px`"
+										></i>
+										<template
+											v-if="
+												item.po_match_status === 'matched' ||
+												item.po_match_status === 'partial'
+											"
+										>
+											<a
+												:href="`/app/purchase-order/${item.purchase_order}`"
+												target="_blank"
+												style="color: #666; font-size: 11px"
+											>
+												{{ item.purchase_order }}
+											</a>
+											<span
+												v-if="item.po_match_status === 'partial'"
+												style="color: #5bc0de; font-size: 10px"
+												:title="__('Quantity differs from PO line')"
+											>
+												{{ __("Partial") }}
+											</span>
+											<i
+												class="fa fa-times"
+												style="
+													color: #ccc;
+													cursor: pointer;
+													font-size: 10px;
+												"
+												@click.stop="unlinkItemPO(invoice, item)"
+											></i>
+										</template>
+										<template v-else-if="item.po_match_status === 'ambiguous'">
+											<button
+												class="btn btn-xs btn-warning"
+												style="font-size: 10px; padding: 1px 6px"
+												@click.stop="promptSelectPO(invoice, item)"
+											>
+												{{ __("Select PO") }}
+											</button>
+										</template>
+										<template v-else>
+											<span style="color: #ccc; font-size: 11px">{{
+												__("No PO")
+											}}</span>
+											<button
+												v-if="item.match_status === 'matched'"
+												class="btn btn-xs btn-default"
+												style="
+													font-size: 10px;
+													padding: 1px 6px;
+													margin-left: 2px;
+												"
+												@click.stop="promptSelectPO(invoice, item)"
+												:disabled="!invoice.matched_supplier"
+											>
+												<i class="fa fa-link"></i>
+											</button>
+										</template>
+									</span>
+
+									<!-- PR -->
+									<span
+										style="
+											display: flex;
+											align-items: center;
+											gap: 4px;
+											font-size: 11px;
+										"
+									>
+										<i
+											:class="poStatusIcon(item.pr_match_status).icon"
+											:style="`color: ${
+												poStatusIcon(item.pr_match_status).color
+											}; font-size: 11px`"
+										></i>
+										<template
+											v-if="
+												item.pr_match_status === 'matched' ||
+												item.pr_match_status === 'partial'
+											"
+										>
+											<a
+												:href="`/app/purchase-receipt/${item.purchase_receipt}`"
+												target="_blank"
+												style="color: #666; font-size: 11px"
+											>
+												{{ item.purchase_receipt }}
+											</a>
+											<span
+												v-if="item.pr_match_status === 'partial'"
+												style="color: #5bc0de; font-size: 10px"
+												:title="__('Quantity differs from PR line')"
+											>
+												{{ __("Partial") }}
+											</span>
+											<i
+												class="fa fa-times"
+												style="
+													color: #ccc;
+													cursor: pointer;
+													font-size: 10px;
+												"
+												@click.stop="unlinkItemPR(invoice, item)"
+											></i>
+										</template>
+										<template v-else-if="item.pr_match_status === 'ambiguous'">
+											<button
+												class="btn btn-xs btn-warning"
+												style="font-size: 10px; padding: 1px 6px"
+												@click.stop="promptSelectPR(invoice, item)"
+											>
+												{{ __("Select PR") }}
+											</button>
+										</template>
+										<template v-else>
+											<span style="color: #ccc; font-size: 11px">{{
+												__("No PR")
+											}}</span>
+											<button
+												v-if="item.match_status === 'matched'"
+												class="btn btn-xs btn-default"
+												style="
+													font-size: 10px;
+													padding: 1px 6px;
+													margin-left: 2px;
+												"
+												@click.stop="promptSelectPR(invoice, item)"
+												:disabled="!invoice.matched_supplier"
+											>
+												<i class="fa fa-link"></i>
+											</button>
+										</template>
+									</span>
+								</div>
 							</div>
 							<div style="display: flex; align-items: center; gap: 8px">
 								<span

@@ -92,14 +92,118 @@ def get_buying_settings():
 
 @frappe.whitelist()
 def link_purchase_order(name, purchase_order):
-	frappe.db.set_value("ePurchase Invoice", name, "purchase_order", purchase_order)
+	from erpnext_einvoicing.erpnext_einvoicing.utils.facturx import _auto_match_items
+
+	doc = frappe.get_doc("ePurchase Invoice", name)
+	doc.purchase_order = purchase_order
+
+	_auto_match_items(doc)
+	doc.reload()
+
+	for item in doc.items:
+		if item.match_status != "matched" or not item.matched_item:
+			continue
+		po_line = frappe.db.get_value(
+			"Purchase Order Item",
+			{"parent": purchase_order, "item_code": item.matched_item},
+			["name", "qty"],
+			as_dict=True,
+		)
+		if not po_line:
+			continue
+		billed_qty = frappe.db.sql(
+			"""
+                                   SELECT COALESCE(SUM(qty), 0)
+                                   FROM `tabPurchase Invoice Item`
+                                   WHERE po_detail = %s
+                                     AND docstatus = 1
+		                           """,
+			po_line.name,
+		)[0][0]
+		remaining = po_line.qty - billed_qty
+		item.purchase_order = purchase_order
+		item.po_detail = po_line.name
+		item.po_match_status = "matched" if remaining == item.qty else "partial"
+
+	doc.save(ignore_permissions=True)
+	doc.reload()
+	doc._update_conversion_status()
+	doc.db_set("conversion_status", doc.conversion_status)
+	frappe.db.commit()
+	return {"status": "ok"}
+
+
+@frappe.whitelist()
+def unlink_purchase_order(name):
+	doc = frappe.get_doc("ePurchase Invoice", name)
+	doc.purchase_order = None
+	for item in doc.items:
+		item.purchase_order = None
+		item.po_detail = None
+		item.po_match_status = None
+	doc.save(ignore_permissions=True)
+	doc.reload()
+	doc._update_conversion_status()
+	doc.db_set("conversion_status", doc.conversion_status)
 	frappe.db.commit()
 	return {"status": "ok"}
 
 
 @frappe.whitelist()
 def link_purchase_receipt(name, purchase_receipt):
-	frappe.db.set_value("ePurchase Invoice", name, "purchase_receipt", purchase_receipt)
+	from erpnext_einvoicing.erpnext_einvoicing.utils.facturx import _auto_match_items
+
+	doc = frappe.get_doc("ePurchase Invoice", name)
+	doc.purchase_receipt = purchase_receipt
+
+	_auto_match_items(doc)
+	doc.reload()
+
+	for item in doc.items:
+		if item.match_status != "matched" or not item.matched_item:
+			continue
+		pr_line = frappe.db.get_value(
+			"Purchase Receipt Item",
+			{"parent": purchase_receipt, "item_code": item.matched_item},
+			["name", "qty"],
+			as_dict=True,
+		)
+		if not pr_line:
+			continue
+		billed_qty = frappe.db.sql(
+			"""
+                                   SELECT COALESCE(SUM(qty), 0)
+                                   FROM `tabPurchase Invoice Item`
+                                   WHERE pr_detail = %s
+                                     AND docstatus = 1
+		                           """,
+			pr_line.name,
+		)[0][0]
+		remaining = pr_line.qty - billed_qty
+		item.purchase_receipt = purchase_receipt
+		item.pr_detail = pr_line.name
+		item.pr_match_status = "matched" if remaining == item.qty else "partial"
+
+	doc.save(ignore_permissions=True)
+	doc.reload()
+	doc._update_conversion_status()
+	doc.db_set("conversion_status", doc.conversion_status)
+	frappe.db.commit()
+	return {"status": "ok"}
+
+
+@frappe.whitelist()
+def unlink_purchase_receipt(name):
+	doc = frappe.get_doc("ePurchase Invoice", name)
+	doc.purchase_receipt = None
+	for item in doc.items:
+		item.purchase_receipt = None
+		item.pr_detail = None
+		item.pr_match_status = None
+	doc.save(ignore_permissions=True)
+	doc.reload()
+	doc._update_conversion_status()
+	doc.db_set("conversion_status", doc.conversion_status)
 	frappe.db.commit()
 	return {"status": "ok"}
 
@@ -158,6 +262,12 @@ def get_einvoicing_inbox(date_from=None, date_to=None):
 				"tax_rate",
 				"match_status",
 				"matched_item",
+				"purchase_order",
+				"po_detail",
+				"po_match_status",
+				"purchase_receipt",
+				"pr_detail",
+				"pr_match_status",
 			],
 			order_by="idx asc",
 		)
@@ -255,10 +365,16 @@ def match_supplier(name, matched_supplier, apply_to_all=0):
 		},
 	)
 
-	from erpnext_einvoicing.erpnext_einvoicing.utils.facturx import _auto_match_items
+	from erpnext_einvoicing.erpnext_einvoicing.utils.facturx import (
+		_auto_match_items,
+		_auto_match_po,
+		_auto_match_pr,
+	)
 
 	doc = frappe.get_doc("ePurchase Invoice", name)
 	_auto_match_items(doc)
+	_auto_match_po(doc)
+	_auto_match_pr(doc)
 	doc._update_conversion_status()
 	doc.db_set("conversion_status", doc.conversion_status)
 
@@ -421,6 +537,45 @@ def _rematch_all_pending():
 		from erpnext_einvoicing.erpnext_einvoicing.utils.facturx import _auto_match_items
 
 		_auto_match_items(doc)
+
+
+@frappe.whitelist()
+def rematch_all():
+	from erpnext_einvoicing.erpnext_einvoicing.utils.facturx import (
+		_auto_match_items,
+		_auto_match_po,
+		_auto_match_pr,
+		_auto_match_supplier,
+	)
+
+	invoices = frappe.get_all(
+		"ePurchase Invoice",
+		filters={"conversion_status": ["in", ["pending", "ready"]]},
+		pluck="name",
+	)
+
+	for name in invoices:
+		doc = frappe.get_doc("ePurchase Invoice", name)
+		data = {
+			"supplier_siret": doc.supplier_siret,
+			"supplier_name_raw": doc.supplier_name_raw,
+		}
+		_auto_match_supplier(doc, data)
+		doc.reload()
+		_auto_match_items(doc)
+		doc.reload()
+		_auto_match_po(doc)
+		doc.reload()
+		_auto_match_pr(doc)
+		doc.reload()
+		doc._update_conversion_status()
+		doc.db_set("conversion_status", doc.conversion_status)
+
+	frappe.db.commit()
+	return {
+		"status": "ok",
+		"message": frappe._("{0} invoice(s) processed.").format(len(invoices)),
+	}
 
 
 @frappe.whitelist()
@@ -1006,3 +1161,198 @@ def send_lifecycle_status(name, status_code, refusal_reasons=None):
 		refusal_reasons = _json.loads(refusal_reasons) if refusal_reasons else None
 	doc = frappe.get_doc("ePurchase Invoice", name)
 	return _get_provider().send_lifecycle(status_code, doc, refusal_reasons)
+
+
+@frappe.whitelist()
+def get_po_candidates(name, item_idx):
+	doc = frappe.get_doc("ePurchase Invoice", name)
+	if not doc.matched_supplier:
+		return []
+	item_idx = int(item_idx)
+	item = next((i for i in doc.items if i.idx == item_idx), None)
+	if not item or not item.matched_item:
+		return []
+
+	open_pos = frappe.get_all(
+		"Purchase Order",
+		filters={
+			"supplier": doc.matched_supplier,
+			"status": ["in", ["To Receive and Bill", "To Bill", "Partly Billed"]],
+			"docstatus": 1,
+		},
+		pluck="name",
+	)
+	if not open_pos:
+		return []
+	lines = frappe.get_all(
+		"Purchase Order Item",
+		filters={"item_code": item.matched_item, "parent": ["in", open_pos]},
+		fields=["name", "parent", "item_name", "qty"],
+	)
+	result = []
+	for l in lines:
+		billed_qty = frappe.db.sql(
+			"""
+                                   SELECT COALESCE(SUM(qty), 0)
+                                   FROM `tabPurchase Invoice Item`
+                                   WHERE po_detail = %s
+                                     AND docstatus = 1
+		                           """,
+			l.name,
+		)[0][0]
+		remaining_qty = round(l.qty - billed_qty, 3)
+		if remaining_qty > 0:
+			result.append(
+				{
+					"name": l.name,
+					"parent": l.parent,
+					"item_name": l.item_name,
+					"qty": l.qty,
+					"remaining_qty": remaining_qty,
+				}
+			)
+	return result
+
+
+@frappe.whitelist()
+def get_pr_candidates(name, item_idx):
+	doc = frappe.get_doc("ePurchase Invoice", name)
+	if not doc.matched_supplier:
+		return []
+	item_idx = int(item_idx)
+	item = next((i for i in doc.items if i.idx == item_idx), None)
+	if not item or not item.matched_item:
+		return []
+	open_prs = frappe.get_all(
+		"Purchase Receipt",
+		filters={
+			"supplier": doc.matched_supplier,
+			"status": ["in", ["To Bill", "Partly Billed"]],
+			"docstatus": 1,
+		},
+		pluck="name",
+	)
+	if not open_prs:
+		return []
+	lines = frappe.get_all(
+		"Purchase Receipt Item",
+		filters={"item_code": item.matched_item, "parent": ["in", open_prs]},
+		fields=["name", "parent", "item_name", "qty"],
+	)
+	result = []
+	for l in lines:
+		billed_qty = frappe.db.sql(
+			"""
+                                   SELECT COALESCE(SUM(qty), 0)
+                                   FROM `tabPurchase Invoice Item`
+                                   WHERE pr_detail = %s
+                                     AND docstatus = 1
+		                           """,
+			l.name,
+		)[0][0]
+		remaining_qty = round(l.qty - billed_qty, 3)
+		if remaining_qty > 0:
+			result.append(
+				{
+					"name": l.name,
+					"parent": l.parent,
+					"item_name": l.item_name,
+					"qty": l.qty,
+					"remaining_qty": remaining_qty,
+				}
+			)
+	return result
+
+
+@frappe.whitelist()
+def match_item_po(name, item_idx, purchase_order, po_detail):
+	item_idx = int(item_idx)
+	doc = frappe.get_doc("ePurchase Invoice", name)
+	for item in doc.items:
+		if item.idx == item_idx:
+			po_qty = frappe.db.get_value("Purchase Order Item", po_detail, "qty")
+			billed_qty = frappe.db.sql(
+				"""
+                                       SELECT COALESCE(SUM(qty), 0)
+                                       FROM `tabPurchase Invoice Item`
+                                       WHERE po_detail = %s
+                                         AND docstatus = 1
+			                           """,
+				po_detail,
+			)[0][0]
+			remaining = po_qty - billed_qty
+			item.purchase_order = purchase_order
+			item.po_detail = po_detail
+			item.po_match_status = "matched" if remaining == item.qty else "partial"
+			break
+	doc.save(ignore_permissions=True)
+	doc.reload()
+	doc._update_conversion_status()
+	doc.db_set("conversion_status", doc.conversion_status)
+	frappe.db.commit()
+	return {"status": "ok"}
+
+
+@frappe.whitelist()
+def match_item_pr(name, item_idx, purchase_receipt, pr_detail):
+	item_idx = int(item_idx)
+	doc = frappe.get_doc("ePurchase Invoice", name)
+	for item in doc.items:
+		if item.idx == item_idx:
+			pr_qty = frappe.db.get_value("Purchase Receipt Item", pr_detail, "qty")
+			billed_qty = frappe.db.sql(
+				"""
+                                       SELECT COALESCE(SUM(qty), 0)
+                                       FROM `tabPurchase Invoice Item`
+                                       WHERE pr_detail = %s
+                                         AND docstatus = 1
+			                           """,
+				pr_detail,
+			)[0][0]
+			remaining = pr_qty - billed_qty
+			item.purchase_receipt = purchase_receipt
+			item.pr_detail = pr_detail
+			item.pr_match_status = "matched" if remaining == item.qty else "partial"
+			break
+	doc.save(ignore_permissions=True)
+	doc.reload()
+	doc._update_conversion_status()
+	doc.db_set("conversion_status", doc.conversion_status)
+	frappe.db.commit()
+	return {"status": "ok"}
+
+
+@frappe.whitelist()
+def unlink_item_po(name, item_idx):
+	item_idx = int(item_idx)
+	doc = frappe.get_doc("ePurchase Invoice", name)
+	for item in doc.items:
+		if item.idx == item_idx:
+			item.purchase_order = None
+			item.po_detail = None
+			item.po_match_status = None
+			break
+	doc.save(ignore_permissions=True)
+	doc.reload()
+	doc._update_conversion_status()
+	doc.db_set("conversion_status", doc.conversion_status)
+	frappe.db.commit()
+	return {"status": "ok"}
+
+
+@frappe.whitelist()
+def unlink_item_pr(name, item_idx):
+	item_idx = int(item_idx)
+	doc = frappe.get_doc("ePurchase Invoice", name)
+	for item in doc.items:
+		if item.idx == item_idx:
+			item.purchase_receipt = None
+			item.pr_detail = None
+			item.pr_match_status = None
+			break
+	doc.save(ignore_permissions=True)
+	doc.reload()
+	doc._update_conversion_status()
+	doc.db_set("conversion_status", doc.conversion_status)
+	frappe.db.commit()
+	return {"status": "ok"}

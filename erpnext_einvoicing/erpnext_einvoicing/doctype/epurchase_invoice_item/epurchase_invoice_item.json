@@ -13,7 +13,13 @@
   "tax_rate",
   "column_break_match",
   "match_status",
-  "matched_item"
+  "matched_item",
+  "purchase_order",
+  "po_detail",
+  "po_match_status",
+  "purchase_receipt",
+  "pr_detail",
+  "pr_match_status"
  ],
  "fields": [
   {
@@ -76,6 +82,50 @@
    "label": "Matched Item",
    "options": "Item",
    "in_list_view": 1
+  },
+  {
+   "fieldname": "purchase_order",
+   "fieldtype": "Link",
+   "label": "Purchase Order",
+   "options": "Purchase Order",
+   "read_only": 1,
+   "in_list_view": 0
+  },
+  {
+   "fieldname": "po_detail",
+   "fieldtype": "Data",
+   "label": "PO Line",
+   "read_only": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "po_match_status",
+   "fieldtype": "Select",
+   "label": "PO Match Status",
+   "options": "\nmatched\npartial\nambiguous",
+   "read_only": 1
+  },
+  {
+   "fieldname": "purchase_receipt",
+   "fieldtype": "Link",
+   "label": "Purchase Receipt",
+   "options": "Purchase Receipt",
+   "read_only": 1,
+   "in_list_view": 0
+  },
+  {
+   "fieldname": "pr_detail",
+   "fieldtype": "Data",
+   "label": "PR Line",
+   "read_only": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "pr_match_status",
+   "fieldtype": "Select",
+   "label": "PR Match Status",
+   "options": "\nmatched\npartial\nambiguous",
+   "read_only": 1
   }
  ],
  "istable": 1,

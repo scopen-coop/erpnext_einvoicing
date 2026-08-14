@@ -269,6 +269,8 @@ def _create_doc(data: dict, xml_bytes: bytes, flow_data: dict, pdf_content=None)
 
 	_auto_match_supplier(doc, data)
 	_auto_match_items(doc)
+	_auto_match_po(doc)
+	_auto_match_pr(doc)
 
 	return doc
 
@@ -355,6 +357,170 @@ def _auto_match_items(doc):
 				item.matched_item = matched
 				item.match_status = "matched"
 				updated = True
+
+	if updated:
+		doc.save(ignore_permissions=True)
+		frappe.db.commit()
+
+
+### PO auto-matching
+
+
+def _auto_match_po(doc):
+	"""
+	Priority:
+	1. Exact match — une seule ligne PO, qty identique -> matched
+	2. Partial match — une seule ligne PO, qty différente -> partial
+	3. Ambiguous — plusieurs lignes PO candidates -> ambiguous
+	4. Aucune -> on ne touche pas la ligne
+	"""
+	if not doc.matched_supplier:
+		return
+
+	updated = False
+
+	for item in doc.items:
+		if item.match_status not in ("matched",) or not item.matched_item:
+			continue
+		po_lines = frappe.get_all(
+			"Purchase Order Item",
+			filters={
+				"item_code": item.matched_item,
+				"parent": [
+					"in",
+					frappe.get_all(
+						"Purchase Order",
+						filters={
+							"supplier": doc.matched_supplier,
+							"status": ["in", ["To Receive and Bill", "To Bill", "Partly Billed"]],
+							"docstatus": 1,
+						},
+						pluck="name",
+					),
+				],
+			},
+			fields=["name", "parent", "qty"],
+		)
+		if not po_lines:
+			continue
+		remaining_lines = []
+		for line in po_lines:
+			billed_qty = frappe.db.sql(
+				"""
+                                       SELECT COALESCE(SUM(qty), 0)
+                                       FROM `tabPurchase Invoice Item`
+                                       WHERE po_detail = %s
+                                         AND docstatus = 1
+			                           """,
+				line.name,
+			)[0][0]
+			remaining_qty = line.qty - billed_qty
+			if remaining_qty > 0:
+				remaining_lines.append(
+					{
+						"name": line.name,
+						"parent": line.parent,
+						"qty": line.qty,
+						"remaining_qty": remaining_qty,
+					}
+				)
+		if not remaining_lines:
+			continue
+		if len(remaining_lines) == 1:
+			line = remaining_lines[0]
+			item.purchase_order = line["parent"]
+			item.po_detail = line["name"]
+			item.po_match_status = "matched" if line["remaining_qty"] == item.qty else "partial"
+			updated = True
+		else:
+			item.po_match_status = "ambiguous"
+			updated = True
+
+	po_names = set(item.purchase_order for item in doc.items if item.purchase_order)
+	if len(po_names) == 1:
+		doc.purchase_order = po_names.pop()
+		updated = True
+
+	if updated:
+		doc.save(ignore_permissions=True)
+		frappe.db.commit()
+
+
+### PR auto-matching
+
+
+def _auto_match_pr(doc):
+	"""
+	Priority:
+	1. Exact match — une seule ligne PR, qty identique -> matched
+	2. Partial match — une seule ligne PR, qty différente -> partial
+	3. Ambiguous — plusieurs lignes PR candidates -> ambiguous
+	4. Aucune -> on ne touche pas la ligne
+	"""
+	if not doc.matched_supplier:
+		return
+	updated = False
+	for item in doc.items:
+		if item.match_status not in ("matched",) or not item.matched_item:
+			continue
+		pr_lines = frappe.get_all(
+			"Purchase Receipt Item",
+			filters={
+				"item_code": item.matched_item,
+				"parent": [
+					"in",
+					frappe.get_all(
+						"Purchase Receipt",
+						filters={
+							"supplier": doc.matched_supplier,
+							"status": ["in", ["To Bill", "Partly Billed"]],
+							"docstatus": 1,
+						},
+						pluck="name",
+					),
+				],
+			},
+			fields=["name", "parent", "qty"],
+		)
+		if not pr_lines:
+			continue
+		remaining_lines = []
+		for line in pr_lines:
+			billed_qty = frappe.db.sql(
+				"""
+                                       SELECT COALESCE(SUM(qty), 0)
+                                       FROM `tabPurchase Invoice Item`
+                                       WHERE pr_detail = %s
+                                         AND docstatus = 1
+			                           """,
+				line.name,
+			)[0][0]
+			remaining_qty = line.qty - billed_qty
+			if remaining_qty > 0:
+				remaining_lines.append(
+					{
+						"name": line.name,
+						"parent": line.parent,
+						"qty": line.qty,
+						"remaining_qty": remaining_qty,
+					}
+				)
+		if not remaining_lines:
+			continue
+		if len(remaining_lines) == 1:
+			line = remaining_lines[0]
+			item.purchase_receipt = line["parent"]
+			item.pr_detail = line["name"]
+			item.pr_match_status = "matched" if line["remaining_qty"] == item.qty else "partial"
+			updated = True
+		else:
+			item.pr_match_status = "ambiguous"
+			updated = True
+
+	pr_names = set(item.purchase_receipt for item in doc.items if item.purchase_receipt)
+	if len(pr_names) == 1:
+		doc.purchase_receipt = pr_names.pop()
+		updated = True
 
 	if updated:
 		doc.save(ignore_permissions=True)

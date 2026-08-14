@@ -7,6 +7,7 @@ import frappe
 def after_migrate():
 	_create_uom_mappings()
 	_insert_refusal_reasons()
+	_create_custom_fields()
 
 
 ### Private
@@ -65,4 +66,22 @@ def _insert_refusal_reasons():
 			doc.reason_code = r["reason_code"]
 			doc.reason_label = r["reason_label"]
 			doc.insert(ignore_permissions=True)
+	frappe.db.commit()
+
+
+def _create_custom_fields():
+	if not frappe.db.exists("Custom Field", "Purchase Invoice Item-po_match_status"):
+		frappe.get_doc(
+			{
+				"doctype": "Custom Field",
+				"dt": "Purchase Invoice Item",
+				"fieldname": "po_match_status",
+				"label": "PO Match Status",
+				"fieldtype": "Select",
+				"options": "\nmatched\npartial\nambiguous",
+				"read_only": 1,
+				"in_list_view": 1,
+				"insert_after": "amount",
+			}
+		).insert(ignore_permissions=True)
 	frappe.db.commit()

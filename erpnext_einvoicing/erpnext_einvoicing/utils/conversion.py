@@ -49,6 +49,11 @@ def build_purchase_invoice(epurchase_invoice):
 				"uom": _resolve_uom(item.uom),
 				"rate": item.unit_price,
 				"amount": item.amount,
+				"purchase_order": item.purchase_order or None,
+				"po_detail": item.po_detail or None,
+				"purchase_receipt": item.purchase_receipt or None,
+				"pr_detail": item.pr_detail or None,
+				"po_match_status": item.po_match_status or None,
 			},
 		)
 
