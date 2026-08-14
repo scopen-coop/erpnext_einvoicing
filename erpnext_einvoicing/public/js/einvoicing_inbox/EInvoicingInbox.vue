@@ -892,6 +892,10 @@ function formatDate(dateStr) {
 	return frappe.datetime.str_to_user(dateStr);
 }
 
+function isLocked(invoice) {
+	return ["converted", "refused"].includes(invoice.conversion_status);
+}
+
 function poStatusIcon(status) {
 	if (status === "matched") return { icon: "fa fa-check-circle", color: "#5cb85c" };
 	if (status === "partial") return { icon: "fa fa-info-circle", color: "#5bc0de" };
@@ -1455,73 +1459,81 @@ async function refreshLifecycleLog(invoice) {
 							@click="enrichFromSiret(invoice)"
 							:title="__('Click to review')"
 						>
-							SIRENE {{ invoice.sirene_status === "warning" ? "⚠" : "✓" }}
-						</span>
-
-						<!-- Supplier matched -->
-						<template v-if="invoice.supplier_match_status === 'matched'">
-							<i class="fa fa-link" style="color: green"></i>
-							<a
-								:href="`/app/supplier/${invoice.matched_supplier}`"
-								target="_blank"
-								>{{ invoice.matched_supplier }}</a
-							>
-							<span
-								@click="confirmDeleteMatchedSupplier(invoice)"
-								style="cursor: pointer"
-							>
-								<i class="fa fa-times" style="color: #c11d1d"></i>
-							</span>
-						</template>
-
-						<!-- eThirdParty -->
-						<template v-else-if="invoice.ethirdparty_doc">
-							<i class="fa fa-user-o" style="color: #6c757d"></i>
-							<span>{{
-								invoice.ethirdparty_doc.party_name || invoice.supplier_name_raw
-							}}</span>
-							<button
-								v-if="invoice.ethirdparty_doc.status === 'warning'"
-								class="btn btn-xs btn-warning"
-								@click="
-									promptEditEThirdParty(invoice, invoice.ethirdparty_doc, [])
+							SIRENE
+							<i
+								:class="
+									invoice.sirene_status === 'warning'
+										? 'fa fa-exclamation-triangle'
+										: 'fa fa-check'
 								"
-							>
-								<i class="fa fa-edit"></i> {{ __("Edit") }}
-							</button>
-							<span @click="unlinkEThirdParty(invoice)" style="cursor: pointer">
-								<i class="fa fa-times" style="color: #c11d1d"></i>
-							</span>
-						</template>
+							></i>
+						</span>
+						<template v-if="!isLocked(invoice)">
+							<!-- Supplier matched -->
+							<template v-if="invoice.supplier_match_status === 'matched'">
+								<i class="fa fa-link" style="color: green"></i>
+								<a
+									:href="`/app/supplier/${invoice.matched_supplier}`"
+									target="_blank"
+									>{{ invoice.matched_supplier }}</a
+								>
+								<span
+									@click="confirmDeleteMatchedSupplier(invoice)"
+									style="cursor: pointer"
+								>
+									<i class="fa fa-times" style="color: #c11d1d"></i>
+								</span>
+							</template>
 
-						<!-- Unmatched -->
-						<template v-else>
-							<button
-								class="btn btn-xs btn-default"
-								@click="rematchSupplier(invoice)"
-							>
-								<i class="fa fa-refresh"></i> {{ __("Check") }}
-							</button>
-							<button
-								class="btn btn-xs btn-default"
-								@click="promptMatchSupplier(invoice)"
-							>
-								<i class="fa fa-link"></i> {{ __("Match") }}
-							</button>
-							<button
-								v-if="invoice.supplier_siret"
-								class="btn btn-xs btn-default"
-								@click="enrichFromSiret(invoice)"
-							>
-								<i class="fa fa-search"></i> {{ __("SIRENE") }}
-							</button>
-							<span
-								v-if="invoice.sirene_status === 'not_found'"
-								class="indicator-pill red"
-								style="font-size: 11px"
-							>
-								SIRENE <i class="fa fa-close"></i>
-							</span>
+							<!-- eThirdParty -->
+							<template v-else-if="invoice.ethirdparty_doc">
+								<i class="fa fa-user-o" style="color: #6c757d"></i>
+								<span>{{
+									invoice.ethirdparty_doc.party_name || invoice.supplier_name_raw
+								}}</span>
+								<button
+									v-if="invoice.ethirdparty_doc.status === 'warning'"
+									class="btn btn-xs btn-warning"
+									@click="
+										promptEditEThirdParty(invoice, invoice.ethirdparty_doc, [])
+									"
+								>
+									<i class="fa fa-edit"></i> {{ __("Edit") }}
+								</button>
+								<span @click="unlinkEThirdParty(invoice)" style="cursor: pointer">
+									<i class="fa fa-times" style="color: #c11d1d"></i>
+								</span>
+							</template>
+
+							<!-- Unmatched -->
+							<template v-else>
+								<button
+									class="btn btn-xs btn-default"
+									@click="rematchSupplier(invoice)"
+								>
+									<i class="fa fa-refresh"></i> {{ __("Check") }}
+								</button>
+								<button
+									class="btn btn-xs btn-default"
+									@click="promptMatchSupplier(invoice)"
+								>
+									<i class="fa fa-link"></i> {{ __("Match") }}
+								</button>
+								<button
+									v-if="invoice.supplier_siret"
+									class="btn btn-xs btn-default"
+									@click="enrichFromSiret(invoice)"
+								>
+									<i class="fa fa-search"></i> {{ __("SIRENE") }}
+								</button>
+								<span
+									v-if="invoice.sirene_status === 'not_found'"
+									class="indicator-pill red"
+									style="font-size: 11px"
+								>
+									SIRENE <i class="fa fa-close"></i>
+								</span>
+							</template>
 						</template>
 					</div>
 				</div>
@@ -1554,12 +1566,16 @@ async function refreshLifecycleLog(invoice) {
 								>
 									{{ invoice.purchase_order }}
 								</a>
-								<span @click="unlinkPO(invoice)" style="cursor: pointer">
+								<span
+									v-if="!isLocked(invoice)"
+									@click="unlinkPO(invoice)"
+									style="cursor: pointer"
+								>
 									<i class="fa fa-times" style="color: #c11d1d"></i>
 								</span>
 							</template>
 							<button
-								v-else
+								v-else-if="!isLocked(invoice)"
 								class="btn btn-xs btn-default"
 								@click="promptLinkPO(invoice)"
 								:disabled="!invoice.matched_supplier"
@@ -1579,12 +1595,16 @@ async function refreshLifecycleLog(invoice) {
 								>
 									{{ invoice.purchase_receipt }}
 								</a>
-								<span @click="unlinkPR(invoice)" style="cursor: pointer">
+								<span
+									v-if="!isLocked(invoice)"
+									@click="unlinkPR(invoice)"
+									style="cursor: pointer"
+								>
 									<i class="fa fa-times" style="color: #c11d1d"></i>
 								</span>
 							</template>
 							<button
-								v-else
+								v-else-if="!isLocked(invoice)"
 								class="btn btn-xs btn-warning"
 								@click="promptLinkPR(invoice)"
 							>
@@ -1673,6 +1693,7 @@ async function refreshLifecycleLog(invoice) {
 										>
 										<span v-else>{{ __("No tax") }}</span>
 										<i
+											v-if="!isLocked(invoice)"
 											class="fa fa-pencil"
 											style="cursor: pointer; margin-left: 6px"
 											@click="editItemTaxRate(invoice, item)"
@@ -1726,6 +1747,7 @@ async function refreshLifecycleLog(invoice) {
 												{{ __("Partial") }}
 											</span>
 											<i
+												v-if="!isLocked(invoice)"
 												class="fa fa-times"
 												style="
 													color: #ccc;
@@ -1749,7 +1771,7 @@ async function refreshLifecycleLog(invoice) {
 												}}</span>
 											</template>
 											<button
-												v-else
+												v-else-if="!isLocked(invoice)"
 												class="btn btn-xs btn-warning"
 												style="font-size: 10px; padding: 1px 6px"
 												@click.stop="promptSelectPO(invoice, item)"
@@ -1762,7 +1784,10 @@ async function refreshLifecycleLog(invoice) {
 												{{ __("No PO") }}
 											</span>
 											<button
-												v-if="item.match_status === 'matched'"
+												v-if="
+													item.match_status === 'matched' &&
+													!isLocked(invoice)
+												"
 												class="btn btn-xs btn-default"
 												style="
 													font-size: 10px;
@@ -1813,6 +1838,7 @@ async function refreshLifecycleLog(invoice) {
 												{{ __("Partial") }}
 											</span>
 											<i
+												v-if="!isLocked(invoice)"
 												class="fa fa-times"
 												style="
 													color: #ccc;
@@ -1836,7 +1862,7 @@ async function refreshLifecycleLog(invoice) {
 												}}</span>
 											</template>
 											<button
-												v-else
+												v-else-if="!isLocked(invoice)"
 												class="btn btn-xs btn-warning"
 												style="font-size: 10px; padding: 1px 6px"
 												@click.stop="promptSelectPR(invoice, item)"
@@ -1849,7 +1875,10 @@ async function refreshLifecycleLog(invoice) {
 												{{ __("No PR") }}
 											</span>
 											<button
-												v-if="item.match_status === 'matched'"
+												v-if="
+													item.match_status === 'matched' &&
+													!isLocked(invoice)
+												"
 												class="btn btn-xs btn-default"
 												style="
 													font-size: 10px;
@@ -1885,6 +1914,7 @@ async function refreshLifecycleLog(invoice) {
 										{{ item.matched_item }}
 									</a>
 									<span
+										v-if="!isLocked(invoice)"
 										@click="confirmDeleteMatchedItem(invoice, item)"
 										style="cursor: pointer"
 									>
@@ -1897,12 +1927,20 @@ async function refreshLifecycleLog(invoice) {
 								</template>
 								<template v-else>
 									<button
+										v-if="!isLocked(invoice)"
+										:disabled="!supplierReady(invoice)"
 										class="btn btn-xs btn-default"
 										@click="rematchItems(invoice)"
+										:title="
+											!supplierReady(invoice)
+												? __('Match a supplier first')
+												: ''
+										"
 									>
 										<i class="fa fa-refresh"></i>
 									</button>
 									<span
+										v-if="!isLocked(invoice)"
 										:title="
 											!supplierReady(invoice)
 												? __('Match a supplier first')
@@ -1911,6 +1949,7 @@ async function refreshLifecycleLog(invoice) {
 										style="display: inline-block"
 									>
 										<button
+											v-if="!isLocked(invoice)"
 											:disabled="!supplierReady(invoice)"
 											class="btn btn-xs btn-default"
 											@click="promptMatchItem(invoice, item)"
@@ -1919,6 +1958,7 @@ async function refreshLifecycleLog(invoice) {
 										</button>
 									</span>
 									<span
+										v-if="!isLocked(invoice)"
 										:title="
 											!supplierReady(invoice)
 												? __('Match a supplier first')

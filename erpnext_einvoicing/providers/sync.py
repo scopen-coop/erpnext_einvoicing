@@ -99,6 +99,7 @@ def link_purchase_order(name, purchase_order):
 
 	_auto_match_items(doc)
 	doc.reload()
+	doc.purchase_order = purchase_order
 
 	for item in doc.items:
 		if item.match_status != "matched" or not item.matched_item:
@@ -154,10 +155,10 @@ def link_purchase_receipt(name, purchase_receipt):
 	from erpnext_einvoicing.erpnext_einvoicing.utils.facturx import _auto_match_items
 
 	doc = frappe.get_doc("ePurchase Invoice", name)
-	doc.purchase_receipt = purchase_receipt
 
 	_auto_match_items(doc)
 	doc.reload()
+	doc.purchase_receipt = purchase_receipt
 
 	for item in doc.items:
 		if item.match_status != "matched" or not item.matched_item:

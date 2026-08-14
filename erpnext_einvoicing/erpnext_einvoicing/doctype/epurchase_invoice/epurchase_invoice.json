@@ -85,6 +85,7 @@
    "fieldtype": "Link",
    "label": "Approved Platform",
    "options": "Approved Platforms",
+   "read_only": 1,
    "reqd": 1,
    "in_list_view": 1
   },
@@ -163,6 +164,7 @@
    "fieldtype": "Link",
    "label": "Matched Supplier",
    "options": "Supplier",
+   "read_only": 1,
    "in_list_view": 1
   },
   {
@@ -170,6 +172,7 @@
    "fieldtype": "Link",
    "label": "eThirdParty",
    "options": "eThirdParty",
+   "read_only": 1,
    "in_list_view": 0
   },
   {
@@ -238,13 +241,15 @@
    "fieldname": "purchase_order",
    "fieldtype": "Link",
    "label": "Purchase Order",
-   "options": "Purchase Order"
+   "options": "Purchase Order",
+   "read_only": 1
   },
   {
    "fieldname": "purchase_receipt",
    "fieldtype": "Link",
    "label": "Purchase Receipt",
-   "options": "Purchase Receipt"
+   "options": "Purchase Receipt",
+   "read_only": 1
   },
   {
    "fieldname": "items_section",
