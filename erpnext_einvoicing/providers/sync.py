@@ -7,6 +7,7 @@ from erpnext_einvoicing.erpnext_einvoicing.doctype.einvoicing_settings.einvoicin
 	get_provider,
 )
 
+
 ### Helpers
 
 
@@ -1182,6 +1183,125 @@ def poll_single_lifecycle_log(log_name):
 		return {"status": "error"}
 	_poll_one_lifecycle_log(provider, log[0])
 	return {"status": "ok"}
+
+
+@frappe.whitelist()
+def rebuild_lifecycle_logs():
+	frappe.only_for("System Manager")
+	provider = _get_provider()
+
+	# Factures sans log indexées par invoice_number
+	invoices_without_log = {
+		inv["invoice_number"]: inv["name"]
+		for inv in frappe.db.sql("""
+			SELECT name, invoice_number
+			FROM `tabePurchase Invoice`
+			WHERE name NOT IN (SELECT DISTINCT parent
+			                FROM `tabeInvoicing Lifecycle Log`)
+			AND invoice_number IS NOT NULL
+			AND invoice_number != ''
+			""", as_dict=True)
+	}
+
+	if not invoices_without_log:
+		return {"status": "ok", "message": frappe._("No invoices to process.")}
+
+	# Un seul appel pour tous les CDARs sortants
+	result = provider.call_api(
+		"flows/search",
+		"POST",
+		params={
+			"where": {
+				"updatedAfter": "1970-01-01T00:00:00.000Z",
+				"flowDirection": ["Out"],
+			},
+			"limit": 1000,
+		},
+	)
+	if result["status_code"] not in (200, 202):
+		return {"status": "error", "message": f"HTTP {result['status_code']}"}
+
+	flows = [
+		f for f in result["response"].get("results", [])
+		if f.get("flowSyntax") == "CDAR" and f.get("flowType") == "SupplierInvoiceLC"
+	]
+
+	if not flows:
+		return {"status": "ok", "message": frappe._("No CDAR flows found.")}
+
+	from pyfrctc import parse_cdar
+	created = skipped = errors = 0
+
+	for flow in flows:
+		try:
+			flow_id = flow.get("flowId")
+
+			xml_result = provider.call_api(
+				f"flows/{flow_id}",
+				"GET",
+				params={"docType": "Original"},
+				extra_headers={"Accept": "application/octet-stream"},
+			)
+
+			if xml_result["status_code"] not in (200, 202):
+				errors += 1
+				continue
+			if not isinstance(xml_result["response"], bytes):
+				errors += 1
+				continue
+
+			cdar_dict = parse_cdar(xml_result["response"])
+			invoice_number = cdar_dict.get("invoice_number", "")
+			status_code = cdar_dict.get("status_code", "")
+			status_label = cdar_dict.get("status_name", "")
+
+			if not invoice_number or not status_code:
+				skipped += 1
+				continue
+
+			einvoice_name = invoices_without_log.get(invoice_number)
+			if not einvoice_name:
+				skipped += 1
+				continue
+
+			if frappe.db.exists("eInvoicing Lifecycle Log", {"cdar_flow_id": flow_id}):
+				skipped += 1
+				continue
+
+			ack = flow.get("acknowledgement", {})
+			ack_status_raw = ack.get("status", "")
+			ack_status = "ok" if ack_status_raw == "Ok" else ("error" if ack_status_raw == "Error" else "pending")
+			ack_message = (ack.get("details") or [{}])[0].get("reasonMessage", "") or None
+
+			log = frappe.new_doc("eInvoicing Lifecycle Log")
+			log.parent = einvoice_name
+			log.parenttype = "ePurchase Invoice"
+			log.parentfield = "lifecycle_logs"
+			log.status_code = status_code
+			from erpnext_einvoicing.providers.base_provider import LIFECYCLE_STATUS_MAP
+			log.status_label = frappe._(LIFECYCLE_STATUS_MAP.get(status_code, status_code))
+			log.cdar_flow_id = flow_id
+			submitted_at = flow.get("submittedAt", "")
+			if submitted_at:
+				from frappe.utils import get_datetime
+				dt = get_datetime(submitted_at)
+				log.sent_at = dt.replace(tzinfo=None) if dt else None
+			log.ack_status = ack_status
+			log.error_type = "data" if ack_status == "error" else None
+			log.ack_message = ack_message
+			log.insert(ignore_permissions=True)
+			created += 1
+
+		except Exception:
+			import traceback
+			frappe.log_error(frappe.get_traceback(), f"rebuild_lifecycle_logs — {flow.get('flowId')}")
+			errors += 1
+
+	frappe.db.commit()
+	return {
+		"status": "ok",
+		"message": frappe._("{0} logs created, {1} skipped, {2} errors.").format(created, skipped, errors),
+	}
 
 
 @frappe.whitelist()

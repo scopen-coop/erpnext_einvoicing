@@ -15,6 +15,9 @@ frappe.ui.form.on("eInvoicing Settings", {
 		frm.fields_dict.send_sample_invoice.$input.html(
 			'<i class="fa fa-paper-plane"></i> ' + __("Send Sample Invoice")
 		);
+		frm.fields_dict.rebuild_lifecycle_logs.$input.html(
+			'<i class="fa fa-refresh"></i> ' + __("Rebuild Lifecycle Logs")
+		);
 	},
 
 	healthcheck(frm) {
@@ -52,11 +55,26 @@ frappe.ui.form.on("eInvoicing Settings", {
 			title: __("Send Sample Invoice"),
 		});
 	},
+	rebuild_lifecycle_logs(frm) {
+		frappe.call({
+			method: "erpnext_einvoicing.providers.sync.rebuild_lifecycle_logs",
+			freeze: true,
+			freeze_message: __("Rebuilding lifecycle logs..."),
+			callback(r) {
+				if (r.message) {
+					frappe.show_alert({
+						message: r.message.message,
+						indicator: r.message.status === "ok" ? "green" : "red",
+					}, 10);
+				}
+			},
+		});
+	},
 });
 
 /*** Helpers ***/
 
-function _run_action(frm, { method, freeze_message, title, on_success }) {
+function _run_action(frm, {method, freeze_message, title, on_success}) {
 	const run = () => {
 		frappe.call({
 			method: method,
@@ -71,10 +89,10 @@ function _run_action(frm, { method, freeze_message, title, on_success }) {
 					});
 					return;
 				}
-				const { status, message } = r.message;
+				const {status, message} = r.message;
 				const indicator =
-					{ ok: "green", warning: "orange", error: "red" }[status] ?? "blue";
-				frappe.msgprint({ title, message, indicator });
+					{ok: "green", warning: "orange", error: "red"}[status] ?? "blue";
+				frappe.msgprint({title, message, indicator});
 				if (status === "ok" && on_success) {
 					on_success();
 				}

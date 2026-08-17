@@ -1,123 +1,59 @@
 {
- "app": "erpnext",
  "charts": [],
- "content": "[{\"id\":\"einv-sc-1\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"eInvoicing Inbox\",\"col\":3}},{\"id\":\"einv-sc-2\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"eInvoicing Settings\",\"col\":3}},{\"id\":\"einv-card-1\",\"type\":\"card\",\"data\":{\"card_name\":\"Documents\",\"col\":4}},{\"id\":\"einv-card-2\",\"type\":\"card\",\"data\":{\"card_name\":\"Configuration\",\"col\":4}}]",
+ "content": "[{\"id\":\"LPEtMYZbgM\",\"type\":\"card\",\"data\":{\"card_name\":\"eInvoicing\",\"col\":4}}]",
  "creation": "2026-07-31 11:50:03.852585",
  "custom_blocks": [],
  "docstatus": 0,
  "doctype": "Workspace",
+ "for_user": "",
  "hide_custom": 0,
- "icon": "file-text",
+ "icon": "integration",
  "idx": 0,
+ "indicator_color": "",
  "is_hidden": 0,
  "label": "eInvoicing",
  "links": [
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "ePurchase Invoice",
-   "link_count": 0,
-   "link_to": "ePurchase Invoice",
+   "label": "eInvoicing",
+   "link_count": 2,
    "link_type": "DocType",
-   "onboard": 1,
-   "type": "Link"
+   "onboard": 0,
+   "type": "Card Break"
   },
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "eThirdParty",
+   "label": "Inbox",
    "link_count": 0,
-   "link_to": "eThirdParty",
-   "link_type": "DocType",
+   "link_to": "einvoicing-inbox",
+   "link_type": "Page",
    "onboard": 0,
    "type": "Link"
   },
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "eInvoicing Flow",
-   "link_count": 0,
-   "link_to": "eInvoicing Flow",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "eInvoicing Sync Log",
-   "link_count": 0,
-   "link_to": "eInvoicing Sync Log",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Approved Platforms",
-   "link_count": 0,
-   "link_to": "Approved Platforms",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "eInvoicing Settings",
+   "label": "Settings",
    "link_count": 0,
    "link_to": "eInvoicing Settings",
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "eInvoicing UOM Mapping",
-   "link_count": 0,
-   "link_to": "eInvoicing UOM Mapping",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "eInvoicing Tax Mapping",
-   "link_count": 0,
-   "link_to": "eInvoicing Tax Mapping",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
   }
  ],
- "modified": "2026-07-31 15:17:23.013260",
+ "modified": "2026-08-17 14:30:51.069357",
  "modified_by": "Administrator",
  "module": "ERPNext eInvoicing",
  "name": "eInvoicing",
  "number_cards": [],
  "owner": "Administrator",
- "parent_page": "",
+ "parent_page": "Accounting",
  "public": 1,
  "quick_lists": [],
  "roles": [],
- "sequence_id": 1.0,
- "shortcuts": [
-  {
-   "color": "Blue",
-   "label": "eInvoicing Inbox",
-   "link_to": "einvoicing-inbox",
-   "type": "Page"
-  },
-  {
-   "color": "Grey",
-   "label": "eInvoicing Settings",
-   "link_to": "eInvoicing Settings",
-   "type": "DocType"
-  }
- ],
- "title": "eInvoicing",
- "type": "Workspace"
+ "sequence_id": 15.0,
+ "shortcuts": [],
+ "title": "eInvoicing"
 }

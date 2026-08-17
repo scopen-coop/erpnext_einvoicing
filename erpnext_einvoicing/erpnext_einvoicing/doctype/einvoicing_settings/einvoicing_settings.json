@@ -19,6 +19,7 @@
   "recreate_access_token",
   "delete_access_token",
   "send_sample_invoice",
+  "rebuild_lifecycle_logs",
   "profile_section",
   "invoice_profile",
   "column_break_profile",
@@ -104,6 +105,11 @@
    "fieldname": "send_sample_invoice",
    "fieldtype": "Button",
    "label": "Send Sample Invoice"
+  },
+  {
+   "fieldname": "rebuild_lifecycle_logs",
+   "fieldtype": "Button",
+   "label": "Rebuild Lifecycle Logs"
   },
   {
    "depends_on": "eval:doc.approved_platform",
