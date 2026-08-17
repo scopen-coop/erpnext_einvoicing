@@ -1187,6 +1187,9 @@ def poll_single_lifecycle_log(log_name):
 
 @frappe.whitelist()
 def rebuild_lifecycle_logs():
+	from pyfrctc import parse_cdar
+	from frappe.utils import get_datetime
+	from erpnext_einvoicing.providers.base_provider import LIFECYCLE_STATUS_MAP
 	frappe.only_for("System Manager")
 	provider = _get_provider()
 
@@ -1229,7 +1232,6 @@ def rebuild_lifecycle_logs():
 	if not flows:
 		return {"status": "ok", "message": frappe._("No CDAR flows found.")}
 
-	from pyfrctc import parse_cdar
 	created = skipped = errors = 0
 
 	for flow in flows:
@@ -1278,12 +1280,10 @@ def rebuild_lifecycle_logs():
 			log.parenttype = "ePurchase Invoice"
 			log.parentfield = "lifecycle_logs"
 			log.status_code = status_code
-			from erpnext_einvoicing.providers.base_provider import LIFECYCLE_STATUS_MAP
 			log.status_label = frappe._(LIFECYCLE_STATUS_MAP.get(status_code, status_code))
 			log.cdar_flow_id = flow_id
 			submitted_at = flow.get("submittedAt", "")
 			if submitted_at:
-				from frappe.utils import get_datetime
 				dt = get_datetime(submitted_at)
 				log.sent_at = dt.replace(tzinfo=None) if dt else None
 			log.ack_status = ack_status
