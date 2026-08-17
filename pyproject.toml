@@ -4,7 +4,7 @@ authors = [
     { name = "Scopen", email = "contact@scopen.fr"}
 ]
 description = "Electronic invoicing (e-Invoicing) module for ERPNext"
-requires-python = ">=3.14"
+requires-python = ">=3.11"
 readme = "README.md"
 dynamic = ["version"]
 dependencies = [
