@@ -26,5 +26,231 @@
   "read_only": 1,
   "no_copy": 1,
   "print_hide": 1
-}
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Item",
+  "fieldname": "einvoice_source",
+  "fieldtype": "Link",
+  "label": "eInvoice Source",
+  "options": "ePurchase Invoice",
+  "read_only": 1,
+  "name": "Item-einvoice_source"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Purchase Invoice",
+  "fieldname": "einvoice_source",
+  "fieldtype": "Link",
+  "label": "eInvoice Source",
+  "options": "ePurchase Invoice",
+  "read_only": 1,
+  "name": "Purchase Invoice-einvoice_source"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Purchase Invoice Item",
+  "fieldname": "po_match_status",
+  "fieldtype": "Select",
+  "label": "PO Match Status",
+  "options": "\nmatched\npartial\nambiguous",
+  "read_only": 1,
+  "in_list_view": 1,
+  "insert_after": "amount",
+  "name": "Purchase Invoice Item-po_match_status"
+ },
+ {
+    "doctype": "Custom Field",
+    "dt": "Company",
+    "fieldname": "einvoicing_tab",
+    "fieldtype": "Tab Break",
+    "label": "eInvoicing",
+    "insert_after": "dashboard_tab",
+    "name": "Company-einvoicing_tab"
+  },
+  {
+    "doctype": "Custom Field",
+    "dt": "Company",
+    "fieldname": "einvoicing_platform_section",
+    "fieldtype": "Section Break",
+    "label": "Platform",
+    "insert_after": "einvoicing_tab",
+    "name": "Company-einvoicing_platform_section"
+  },
+  {
+    "doctype": "Custom Field",
+    "dt": "Company",
+    "fieldname": "einvoicing_approved_platform",
+    "fieldtype": "Link",
+    "label": "Approved Platform",
+    "options": "Approved Platforms",
+    "insert_after": "einvoicing_platform_section",
+    "name": "Company-einvoicing_approved_platform"
+  },
+  {
+    "doctype": "Custom Field",
+    "dt": "Company",
+    "fieldname": "einvoicing_live_mode",
+    "fieldtype": "Check",
+    "label": "Live Mode (Production)",
+    "default": "0",
+    "insert_after": "einvoicing_approved_platform",
+    "name": "Company-einvoicing_live_mode"
+  },
+  {
+    "doctype": "Custom Field",
+    "dt": "Company",
+    "fieldname": "einvoicing_auth_section",
+    "fieldtype": "Section Break",
+    "label": "Authentication",
+    "depends_on": "eval:doc.einvoicing_approved_platform",
+    "insert_after": "einvoicing_live_mode",
+    "name": "Company-einvoicing_auth_section"
+  },
+  {
+    "doctype": "Custom Field",
+    "dt": "Company",
+    "fieldname": "einvoicing_client_id",
+    "fieldtype": "Data",
+    "label": "Client ID",
+    "insert_after": "einvoicing_auth_section",
+    "name": "Company-einvoicing_client_id"
+  },
+  {
+    "doctype": "Custom Field",
+    "dt": "Company",
+    "fieldname": "einvoicing_client_secret",
+    "fieldtype": "Password",
+    "label": "Client Secret",
+    "insert_after": "einvoicing_client_id",
+    "name": "Company-einvoicing_client_secret"
+  },
+  {
+    "doctype": "Custom Field",
+    "dt": "Company",
+    "fieldname": "einvoicing_api_key",
+    "fieldtype": "Password",
+    "label": "API Key",
+    "insert_after": "einvoicing_client_secret",
+    "name": "Company-einvoicing_api_key"
+  },
+  {
+    "doctype": "Custom Field",
+    "dt": "Company",
+    "fieldname": "einvoicing_column_break_auth",
+    "fieldtype": "Column Break",
+    "insert_after": "einvoicing_api_key",
+    "name": "Company-einvoicing_column_break_auth"
+  },
+  {
+    "doctype": "Custom Field",
+    "dt": "Company",
+    "fieldname": "einvoicing_access_token",
+    "fieldtype": "Password",
+    "label": "Access Token",
+    "read_only": 1,
+    "insert_after": "einvoicing_column_break_auth",
+    "name": "Company-einvoicing_access_token"
+  },
+  {
+    "doctype": "Custom Field",
+    "dt": "Company",
+    "fieldname": "einvoicing_token_expires_at",
+    "fieldtype": "Datetime",
+    "label": "Token Expires At",
+    "read_only": 1,
+    "insert_after": "einvoicing_access_token",
+    "name": "Company-einvoicing_token_expires_at"
+  },
+  {
+    "doctype": "Custom Field",
+    "dt": "Company",
+    "fieldname": "einvoicing_column_break_buttons",
+    "fieldtype": "Column Break",
+    "insert_after": "einvoicing_token_expires_at",
+    "name": "Company-einvoicing_column_break_buttons"
+  },
+  {
+    "doctype": "Custom Field",
+    "dt": "Company",
+    "fieldname": "einvoicing_healthcheck",
+    "fieldtype": "Button",
+    "label": "Healthcheck",
+    "insert_after": "einvoicing_column_break_buttons",
+    "name": "Company-einvoicing_healthcheck"
+  },
+  {
+    "doctype": "Custom Field",
+    "dt": "Company",
+    "fieldname": "einvoicing_recreate_token",
+    "fieldtype": "Button",
+    "label": "Recreate Access Token",
+    "insert_after": "einvoicing_healthcheck",
+    "name": "Company-einvoicing_recreate_token"
+  },
+  {
+    "doctype": "Custom Field",
+    "dt": "Company",
+    "fieldname": "einvoicing_delete_token",
+    "fieldtype": "Button",
+    "label": "Delete Access Token",
+    "insert_after": "einvoicing_recreate_token",
+    "name": "Company-einvoicing_delete_token"
+  },
+  {
+    "doctype": "Custom Field",
+    "dt": "Company",
+    "fieldname": "einvoicing_rebuild_lifecycle_logs",
+    "fieldtype": "Button",
+    "label": "Rebuild Lifecycle Logs",
+    "insert_after": "einvoicing_delete_token",
+    "name": "Company-einvoicing_rebuild_lifecycle_logs"
+  },
+  {
+    "doctype": "Custom Field",
+    "dt": "Company",
+    "fieldname": "einvoicing_sync_section",
+    "fieldtype": "Section Break",
+    "label": "Synchronization",
+    "insert_after": "einvoicing_rebuild_lifecycle_logs",
+    "name": "Company-einvoicing_sync_section"
+  },
+  {
+    "doctype": "Custom Field",
+    "dt": "Company",
+    "fieldname": "einvoicing_auto_sync",
+    "fieldtype": "Check",
+    "label": "Enable Automatic Synchronisation (every 30 min)",
+    "default": "1",
+    "insert_after": "einvoicing_sync_section",
+    "name": "Company-einvoicing_auto_sync"
+  },
+  {
+    "doctype": "Custom Field",
+    "dt": "Company",
+    "fieldname": "einvoicing_column_break_sync",
+    "fieldtype": "Column Break",
+    "insert_after": "einvoicing_auto_sync",
+    "name": "Company-einvoicing_column_break_sync"
+  },
+  {
+    "doctype": "Custom Field",
+    "dt": "Company",
+    "fieldname": "einvoicing_po_required",
+    "fieldtype": "Check",
+    "label": "Purchase Order Required",
+    "default": "0",
+    "insert_after": "einvoicing_column_break_sync",
+    "name": "Company-einvoicing_po_required"
+  },
+  {
+    "doctype": "Custom Field",
+    "dt": "Company",
+    "fieldname": "einvoicing_pr_required",
+    "fieldtype": "Check",
+    "label": "Purchase Receipt Required",
+    "default": "0",
+    "insert_after": "einvoicing_po_required",
+    "name": "Company-einvoicing_pr_required"
+  }
 ]

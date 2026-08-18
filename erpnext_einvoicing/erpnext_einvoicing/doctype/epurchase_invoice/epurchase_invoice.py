@@ -24,14 +24,14 @@ class ePurchaseInvoice(Document):
 				return False
 			if not item.matched_item:
 				return False
-		settings = frappe.get_single("eInvoicing Settings")
-		if settings.po_required:
+		company_doc = frappe.get_doc("Company", self.company)
+		if company_doc.einvoicing_po_required:
 			has_po = bool(self.purchase_order) or any(
 				item.purchase_order for item in self.items if item.match_status == "matched"
 			)
 			if not has_po:
 				return False
-		if settings.pr_required:
+		if company_doc.einvoicing_pr_required:
 			has_pr = bool(self.purchase_receipt) or any(
 				item.purchase_receipt for item in self.items if item.match_status == "matched"
 			)

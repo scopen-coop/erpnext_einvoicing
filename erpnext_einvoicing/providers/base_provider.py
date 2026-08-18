@@ -30,9 +30,9 @@ class BaseProvider(ABC):
 	Protocol/URL configuration is stored in Approved Platforms.
 	"""
 
-	def __init__(self, settings, platform):
-		self.settings = settings
+	def __init__(self, platform, company_doc):
 		self.platform = platform
+		self.company_doc = company_doc
 
 	### Abstract methods
 
@@ -106,7 +106,11 @@ class BaseProvider(ABC):
 
 	def get_base_url(self) -> str:
 		"""Returns the API base URL based on live_mode in eTransactions Settings."""
-		url = self.platform.prod_api_url if self.settings.live_mode else self.platform.test_api_url
+		url = (
+			self.platform.prod_api_url
+			if self.company_doc.einvoicing_live_mode
+			else self.platform.test_api_url
+		)
 		if not url:
 			frappe.throw(
 				frappe._("API URL not configured on platform '{0}'.").format(self.platform.name),
@@ -116,21 +120,26 @@ class BaseProvider(ABC):
 
 	def is_token_expired(self) -> bool:
 		"""Returns True if the stored access token is missing or within 60 s of expiry."""
-		if not self.settings.access_token:
+		token = (
+			self.company_doc.get_password("einvoicing_access_token")
+			if self.company_doc.einvoicing_access_token
+			else None
+		)
+		if not token:
 			return True
-		if not self.settings.token_expires_at:
+		if not self.company_doc.einvoicing_token_expires_at:
 			return True
-		expires_at = get_datetime(self.settings.token_expires_at)
+		expires_at = get_datetime(self.company_doc.einvoicing_token_expires_at)
 		now = get_datetime(now_datetime())
 		return now >= (expires_at - timedelta(seconds=60))
 
 	def save_token(self, token: str, expires_in: int | None = None) -> None:
 		"""Persist the access token (and optional expiry) in eTransactions Settings."""
-		self.settings.db_set("access_token", token)
+		self.company_doc.db_set("einvoicing_access_token", token)
 		if expires_in:
 			expires_at = add_to_date(now_datetime(), seconds=int(expires_in))
-			self.settings.db_set("token_expires_at", expires_at.strftime("%Y-%m-%d %H:%M:%S"))
-		self.settings.access_token = token
+			self.company_doc.db_set("einvoicing_token_expires_at", expires_at.strftime("%Y-%m-%d %H:%M:%S"))
+		self.company_doc.einvoicing_access_token = token
 
 	# Lifecycle (AFNOR XP Z12-013)
 

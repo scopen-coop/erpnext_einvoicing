@@ -23,7 +23,8 @@ def on_submit(doc, method):
 		try:
 			from erpnext_einvoicing.providers.sync import _get_provider
 
-			_get_provider().send_lifecycle("211", frappe.get_doc("ePurchase Invoice", einvoice_name))
+			einvoice = frappe.get_doc("ePurchase Invoice", einvoice_name)
+			_get_provider(einvoice.company).send_lifecycle("211", einvoice)
 		except Exception:
 			frappe.log_error(
 				frappe.get_traceback(),

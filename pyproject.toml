@@ -10,7 +10,7 @@ dynamic = ["version"]
 dependencies = [
     # "frappe~=16.0.0" # Installed and managed by bench..
     "factur-x>=3.0",
-    "pyfrctc",
+    "pyfrctc>=0.15",
 ]
 
 [build-system]

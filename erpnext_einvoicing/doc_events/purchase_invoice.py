@@ -7,18 +7,12 @@ def on_submit(doc, method):
 	einvoice_name = frappe.db.get_value("ePurchase Invoice", {"purchase_invoice": doc.name}, "name")
 	if not einvoice_name:
 		return
-
-	already_sent = frappe.db.exists(
-		"eInvoicing Lifecycle Log",
-		{"parent": einvoice_name, "status_code": "205", "ack_status": "ok"},
-	)
-	if already_sent:
-		return
-
 	try:
 		from erpnext_einvoicing.providers.sync import _get_provider
 
-		_get_provider().send_lifecycle("205", frappe.get_doc("ePurchase Invoice", einvoice_name))
+		einvoice = frappe.get_doc("ePurchase Invoice", einvoice_name)
+		provider = _get_provider(einvoice.company)
+		provider.send_lifecycle("205", einvoice)
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), f"eInvoicing lifecycle 205 - PI {doc.name}")
 

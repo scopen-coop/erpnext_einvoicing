@@ -17,6 +17,7 @@ const loading = ref(false);
 const syncing = ref(false);
 const filter = ref("pending");
 const expanded = ref(new Set());
+const company = ref(frappe.boot.user.defaults.company || "");
 
 const switchingTab = ref(false);
 watch(filter, () => {
@@ -24,6 +25,16 @@ watch(filter, () => {
 	nextTick(() => {
 		switchingTab.value = false;
 	});
+});
+
+watch(company, async () => {
+	const r = await frappe.call({
+		method: "erpnext_einvoicing.providers.sync.get_buying_settings",
+		args: { company: company.value },
+	});
+	buyingSettings.value = r.message || {};
+	await fetchInvoices(true);
+	await checkPendingFlows();
 });
 /*** Computed ***/
 
@@ -108,7 +119,11 @@ async function fetchInvoices(silent = false) {
 	try {
 		const res = await frappe.call({
 			method: "erpnext_einvoicing.providers.sync.get_einvoicing_inbox",
-			args: { date_from: dateRange.value.date_from, date_to: dateRange.value.date_to },
+			args: {
+				date_from: dateRange.value.date_from,
+				date_to: dateRange.value.date_to,
+				company: company.value,
+			},
 		});
 		invoices.value = res.message || [];
 	} finally {
@@ -125,7 +140,7 @@ async function checkPendingFlows() {
 	try {
 		const r = await frappe.call({
 			method: "erpnext_einvoicing.providers.sync.check_pending_flows",
-			args: { sync_type: "Purchase Invoice" },
+			args: { sync_type: "Purchase Invoice", company: company.value },
 		});
 		if (r.message?.error) {
 			pendingFlowsStatus.value = "error";
@@ -145,7 +160,7 @@ async function syncFlows() {
 	try {
 		const r = await frappe.call({
 			method: "erpnext_einvoicing.providers.sync.sync_flows",
-			args: { sync_type: "Purchase Invoice" },
+			args: { sync_type: "Purchase Invoice", company: company.value },
 		});
 		const msg = r.message || {};
 		const indicator = msg.status === "ok" ? "green" : "orange";
@@ -1027,11 +1042,18 @@ async function unlinkItemPR(invoice, item) {
 
 /*** Lifecycle ***/
 const buyingSettings = ref({ po_required: false, pr_required: false });
+const companies = ref([]);
 onMounted(async () => {
-	const r = await frappe.call({
+	const bs = await frappe.call({
 		method: "erpnext_einvoicing.providers.sync.get_buying_settings",
+		args: { company: company.value },
 	});
-	buyingSettings.value = r.message || {};
+	buyingSettings.value = bs.message || {};
+	const comp = await frappe.call({
+		method: "frappe.client.get_list",
+		args: { doctype: "Company", fields: ["name"], limit: 100 },
+	});
+	companies.value = (comp.message || []).map((c) => c.name);
 	await fetchInvoices();
 	await checkPendingFlows();
 });
@@ -1095,6 +1117,7 @@ async function refreshLifecycleLog(invoice) {
 					</span>
 				</button>
 			</div>
+
 			<!-- Date picker -->
 			<div style="position: relative">
 				<button
@@ -1231,7 +1254,16 @@ async function refreshLifecycleLog(invoice) {
 					@click="closeDatePicker"
 				></div>
 			</div>
-			<div>
+			<div style="display: flex; align-items: center; gap: 8px">
+				<select
+					v-if="companies.length > 0"
+					v-model="company"
+					class="form-control form-control-sm"
+					style="width: auto; font-size: 12px"
+					@change="fetchInvoices(true)"
+				>
+					<option v-for="c in companies" :key="c" :value="c">{{ c }}</option>
+				</select>
 				<button
 					v-if="filter === 'pending'"
 					class="btn btn-sm btn-default"
@@ -1252,39 +1284,35 @@ async function refreshLifecycleLog(invoice) {
 				>
 					<i class="fa fa-arrow-circle-o-right"></i> {{ __("Convert All") }}
 				</button>
-				<button
-					class="btn btn-sm btn-default position-relative"
-					style="margin-right: 20px"
-					:disabled="syncing"
-					@click="syncFlows"
-					:title="
-						pendingFlowsStatus === 'pending'
-							? __('Invoices Pending')
-							: pendingFlowsStatus === 'ok'
-							? __('Synched')
-							: __('Provider Error')
-					"
-				>
+				<button class="btn btn-sm btn-default" :disabled="syncing" @click="syncFlows">
 					<i :class="['fa', syncing ? 'fa-spinner fa-spin' : 'fa-refresh']"></i>
 					{{ __("Sync") }}
-					<span
-						v-if="pendingFlowsStatus === 'pending'"
-						class="position-absolute badge rounded-pill bg-warning"
-						style="font-size: 10px; top: -8px; left: 85%"
-					>
-						{{ pendingFlows }}
-					</span>
-					<span
-						v-else-if="pendingFlowsStatus === 'ok'"
-						class="position-absolute rounded-circle bg-success"
-						style="width: 8px; height: 8px; top: -3px; left: 90%"
-					>
-					</span>
-					<span
-						v-else-if="pendingFlowsStatus === 'error'"
-						class="position-absolute rounded-circle bg-danger"
-						style="width: 8px; height: 8px; top: -3px; left: 90%"
-					>
+					<span style="display: inline-flex; align-items: center; margin-left: 4px">
+						<span
+							v-if="pendingFlowsStatus === 'pending'"
+							style="font-size: 11px; color: #f0ad4e"
+							:title="pendingFlows + ' ' + __('invoices pending')"
+						>
+							<i class="fa fa-circle" style="font-size: 8px"></i>
+							{{ pendingFlows }}
+						</span>
+						<span
+							v-else-if="pendingFlowsStatus === 'ok'"
+							style="font-size: 11px; color: #5cb85c"
+							:title="__('Up to date')"
+						>
+							<i class="fa fa-check" style="font-size: 10px"></i>
+						</span>
+						<span
+							v-else-if="pendingFlowsStatus === 'error'"
+							style="font-size: 11px; color: #d9534f"
+							:title="__('Provider error')"
+						>
+							<i
+								class="fa fa-exclamation-circle"
+								style="font-size: 10px; opacity: 0.7"
+							></i>
+						</span>
 					</span>
 				</button>
 			</div>
