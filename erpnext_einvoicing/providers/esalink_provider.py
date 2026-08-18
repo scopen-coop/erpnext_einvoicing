@@ -26,15 +26,19 @@ class EsalinkProvider(BaseProvider):
 		import base64
 		from urllib.parse import quote
 
-		token_url = self.platform.prod_token_url if self.settings.live_mode else self.platform.test_token_url
+		token_url = (
+			self.platform.prod_token_url
+			if self.company_doc.einvoicing_live_mode
+			else self.platform.test_token_url
+		)
 		if not token_url:
 			frappe.throw(
 				frappe._("Token URL not configured on platform '{0}'.").format(self.platform.name),
 				title=frappe._("Missing Configuration"),
 			)
 
-		client_id = self.settings.client_id or ""
-		client_secret = self.settings.get_password("client_secret") or ""
+		client_id = self.company_doc.einvoicing_client_id or ""
+		client_secret = self.company_doc.get_password("einvoicing_client_secret") or ""
 		encoded = base64.b64encode(
 			f"{quote(client_id, safe='')}:{quote(client_secret, safe='')}".encode()
 		).decode()
@@ -85,9 +89,9 @@ class EsalinkProvider(BaseProvider):
 		return self.get_access_token()
 
 	def delete_access_token(self):
-		self.settings.db_set("access_token", None)
-		self.settings.db_set("token_expires_at", None)
-		self.settings.access_token = None
+		self.company_doc.db_set("einvoicing_access_token", None)
+		self.company_doc.db_set("einvoicing_token_expires_at", None)
+		self.company_doc.einvoicing_access_token = None
 		return True
 
 	### Health
@@ -158,7 +162,7 @@ class EsalinkProvider(BaseProvider):
 		url = f"{base_url}{resource}"
 
 		headers = {
-			"Authorization": f"Bearer {self.settings.get_password('access_token')}",
+			"Authorization": f"Bearer {self.company_doc.get_password('einvoicing_access_token')}",
 			"Content-Type": "application/json",
 			**self._build_api_key_header(),
 		}
@@ -194,7 +198,7 @@ class EsalinkProvider(BaseProvider):
 
 	### Flows
 
-	def check_pending_flows(self, sync_type: str):
+	def check_pending_flows(self, sync_type: str, company=None):
 		payload = self._build_search_payload(sync_type, limit=1)
 		result = self.call_api("flows/search", "POST", params=payload)
 		if result["status_code"] not in (200, 202):
@@ -206,7 +210,7 @@ class EsalinkProvider(BaseProvider):
 		total = result["response"].get("total", 0)
 		return {"has_pending": total > 0, "total": total}
 
-	def sync_flows(self, sync_type: str):
+	def sync_flows(self, sync_type: str, company=None):
 		payload = self._build_search_payload(sync_type, limit=1000)
 		result = self.call_api("flows/search", "POST", params=payload)
 		if result["status_code"] not in (200, 202):
@@ -360,29 +364,14 @@ class EsalinkProvider(BaseProvider):
 			"limit": limit,
 		}
 
-	def _build_auth_payload(self):
-		try:
-			mapping = json.loads(self.platform.auth_payload_map or "{}")
-		except json.JSONDecodeError as e:
-			frappe.throw(
-				frappe._("Invalid JSON in auth_payload_map: {0}").format(str(e)),
-				title=frappe._("Configuration Error"),
-			)
-		payload = {}
-		for api_field, settings_field in mapping.items():
-			if hasattr(self.settings, settings_field):
-				if settings_field in PASSWORD_FIELDS:
-					payload[api_field] = self.settings.get_password(settings_field) or ""
-				else:
-					payload[api_field] = getattr(self.settings, settings_field) or ""
-			else:
-				payload[api_field] = settings_field
-		return payload
-
 	def _build_api_key_header(self):
 		if not self.platform.api_key_header:
 			return {}
-		api_key = self.settings.get_password("api_key") if self.settings.api_key else None
+		api_key = (
+			self.company_doc.get_password("einvoicing_api_key")
+			if self.company_doc.einvoicing_api_key
+			else None
+		)
 		if not api_key:
 			return {}
 		return {self.platform.api_key_header: api_key}
@@ -396,7 +385,7 @@ class EsalinkProvider(BaseProvider):
 		url = f"{base_url}{resource}"
 
 		headers = {
-			"Authorization": f"Bearer {self.settings.get_password('access_token')}",
+			"Authorization": f"Bearer {self.company_doc.get_password('einvoicing_access_token')}",
 			**self._build_api_key_header(),
 		}
 		try:

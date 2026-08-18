@@ -21,6 +21,28 @@ fixtures = [
 					"Item-einvoice_source",
 					"Purchase Invoice-einvoice_source",
 					"Purchase Invoice Item-po_match_status",
+					"Company-einvoicing_section",
+					"Company-einvoicing_approved_platform",
+					"Company-einvoicing_live_mode",
+					"Company-einvoicing_client_id",
+					"Company-einvoicing_client_secret",
+					"Company-einvoicing_api_key",
+					"Company-einvoicing_column_break_auth",
+					"Company-einvoicing_access_token",
+					"Company-einvoicing_token_expires_at",
+					"Company-einvoicing_column_break_buttons",
+					"Company-einvoicing_healthcheck",
+					"Company-einvoicing_recreate_token",
+					"Company-einvoicing_delete_token",
+					"Company-einvoicing_rebuild_lifecycle_logs",
+					"Company-einvoicing_po_required",
+					"Company-einvoicing_pr_required",
+					"Company-einvoicing_auto_sync",
+					"Company-einvoicing_tab",
+					"Company-einvoicing_platform_section",
+					"Company-einvoicing_auth_section",
+					"Company-einvoicing_sync_section",
+					"Company-einvoicing_column_break_sync",
 				],
 			]
 		],
@@ -69,6 +91,9 @@ required_apps = ["frappe", "erpnext"]
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
+doctype_js = {
+	"Company": "public/js/company.js",
+}
 
 # Svg Icons
 # ------------------

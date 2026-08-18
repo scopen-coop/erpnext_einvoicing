@@ -3,54 +3,54 @@
 
 import frappe
 
-from erpnext_einvoicing.erpnext_einvoicing.doctype.einvoicing_settings.einvoicing_settings import (
-	get_provider,
-)
-
-
 ### Helpers
 
 
-def _get_provider():
-	settings = frappe.get_single("eInvoicing Settings")
-
-	if not settings.approved_platform:
-		frappe.throw(frappe._("No Approved Platform configured in eInvoicing Settings."))
-
-	platform = frappe.get_doc("Approved Platforms", settings.approved_platform)
-
+def _get_provider(company=None):
+	if not company:
+		company = frappe.defaults.get_user_default("company")
+	if not company:
+		frappe.throw(frappe._("No company selected."))
+	company_doc = frappe.get_doc("Company", company)
+	if not company_doc.einvoicing_approved_platform:
+		frappe.throw(frappe._("No Approved Platform configured for company '{0}'.").format(company))
+	platform = frappe.get_doc("Approved Platforms", company_doc.einvoicing_approved_platform)
 	if not platform.is_enabled:
 		frappe.throw(frappe._("Platform '{0}' is disabled.").format(platform.name))
+	if platform.provider_type == "Esalink":
+		from erpnext_einvoicing.providers.esalink_provider import EsalinkProvider
 
-	return get_provider(settings, platform)
+		return EsalinkProvider(platform, company_doc)
+	frappe.throw(
+		frappe._("Unsupported provider type: '{0}'.").format(platform.provider_type),
+		title=frappe._("Configuration Error"),
+	)
 
 
 ### Provider whitelisted methods
 
 
 @frappe.whitelist()
-def healthcheck():
+def healthcheck(company=None):
 	frappe.only_for("System Manager")
-	return _get_provider().check_health()
+	return _get_provider(company).check_health()
 
 
 @frappe.whitelist()
-def recreate_access_token():
+def recreate_access_token(company=None):
 	frappe.only_for("System Manager")
-	provider = _get_provider()
+	provider = _get_provider(company)
 	try:
 		provider.get_access_token()
 		return {"status": "ok", "message": frappe._("Access token successfully generated.")}
 	except frappe.ValidationError as e:
 		return {"status": "error", "message": str(e)}
-	except Exception as e:
-		return {"status": "error", "message": frappe._("Unexpected error: {0}").format(str(e))}
 
 
 @frappe.whitelist()
-def delete_access_token():
+def delete_access_token(company=None):
 	frappe.only_for("System Manager")
-	provider = _get_provider()
+	provider = _get_provider(company)
 	try:
 		provider.delete_access_token()
 		return {"status": "ok", "message": frappe._("Access token deleted.")}
@@ -59,18 +59,18 @@ def delete_access_token():
 
 
 @frappe.whitelist()
-def check_pending_flows(sync_type="Purchase Invoice"):
+def check_pending_flows(sync_type="Purchase Invoice", company=None):
 	frappe.only_for("System Manager")
 	try:
-		return _get_provider().check_pending_flows(sync_type)
+		return _get_provider(company).check_pending_flows(sync_type)
 	except Exception as e:
 		return {"has_pending": False, "total": 0, "error": str(e)}
 
 
 @frappe.whitelist()
-def sync_flows(sync_type="Purchase Invoice"):
+def sync_flows(sync_type="Purchase Invoice", company=None):
 	frappe.only_for("System Manager")
-	return _get_provider().sync_flows(sync_type)
+	return _get_provider(company).sync_flows(sync_type)
 
 
 @frappe.whitelist()
@@ -83,11 +83,15 @@ def send_sample_invoice():
 
 
 @frappe.whitelist()
-def get_buying_settings():
-	settings = frappe.get_single("eInvoicing Settings")
+def get_buying_settings(company=None):
+	if not company:
+		company = frappe.defaults.get_user_default("company")
+	if not company:
+		return {"po_required": False, "pr_required": False}
+	company_doc = frappe.get_doc("Company", company)
 	return {
-		"po_required": bool(settings.po_required),
-		"pr_required": bool(settings.pr_required),
+		"po_required": bool(company_doc.einvoicing_po_required),
+		"pr_required": bool(company_doc.einvoicing_pr_required),
 	}
 
 
@@ -211,8 +215,10 @@ def unlink_purchase_receipt(name):
 
 
 @frappe.whitelist()
-def get_einvoicing_inbox(date_from=None, date_to=None):
+def get_einvoicing_inbox(date_from=None, date_to=None, company=None):
 	filters = {"conversion_status": ["in", ["pending", "ready", "converted", "refused"]]}
+	if company:
+		filters["company"] = company
 	if date_from and date_to:
 		filters["invoice_date"] = ["between", [date_from, date_to]]
 	elif date_from:
@@ -1089,7 +1095,8 @@ def refuse_invoice(name, reason_code, reason_comment=None):
 		refusal_reasons[0]["MDT-126"] = reason_comment
 
 	try:
-		_get_provider().send_lifecycle("210", doc, refusal_reasons)
+		einvoice = frappe.get_doc("ePurchase Invoice", name)
+		_get_provider(einvoice.company).send_lifecycle("210", doc, refusal_reasons)
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), f"eInvoicing lifecycle 210 - {name}")
 		frappe.throw(frappe._("Failed to send refusal to platform."))
@@ -1104,25 +1111,34 @@ def refuse_invoice(name, reason_code, reason_comment=None):
 
 def sync_incoming_flows():
 	"""Called by scheduler every 30 min (see hooks.py)."""
-	try:
-		result = _get_provider().sync_flows("Purchase Invoice")
-		if result.get("status") == "error":
-			frappe.log_error(result.get("message"), "eInvoicing scheduled sync error")
-	except Exception:
-		frappe.log_error(frappe.get_traceback(), "eInvoicing scheduled sync exception")
+	companies = frappe.get_all(
+		"Company",
+		filters={
+			"einvoicing_approved_platform": ["!=", ""],
+			"einvoicing_auto_sync": 1,
+		},
+		pluck="name",
+	)
+	for company in companies:
+		try:
+			result = _get_provider(company).sync_flows("Purchase Invoice")
+			if result.get("status") == "error":
+				frappe.log_error(result.get("message"), f"eInvoicing scheduled sync error - {company}")
+		except Exception:
+			frappe.log_error(frappe.get_traceback(), f"eInvoicing scheduled sync exception - {company}")
 
 
 def poll_lifecycle_acknowledgements():
 	"""Called by scheduler"""
 	try:
-		provider = _get_provider()
 		pending_logs = frappe.get_all(
 			"eInvoicing Lifecycle Log",
 			filters={"ack_status": "pending"},
 			fields=["name", "cdar_flow_id", "parent"],
 		)
 		for log in pending_logs:
-			_poll_one_lifecycle_log(provider, log)
+			company = frappe.db.get_value("ePurchase Invoice", log.parent, "company")
+			_poll_one_lifecycle_log(_get_provider(company), log)
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), "eInvoicing lifecycle poll exception")
 
@@ -1187,23 +1203,28 @@ def poll_single_lifecycle_log(log_name):
 
 @frappe.whitelist()
 def rebuild_lifecycle_logs():
-	from pyfrctc import parse_cdar
 	from frappe.utils import get_datetime
+	from pyfrctc import parse_cdar
+
 	from erpnext_einvoicing.providers.base_provider import LIFECYCLE_STATUS_MAP
+
 	frappe.only_for("System Manager")
 	provider = _get_provider()
 
 	# Factures sans log indexées par invoice_number
 	invoices_without_log = {
 		inv["invoice_number"]: inv["name"]
-		for inv in frappe.db.sql("""
-			SELECT name, invoice_number
-			FROM `tabePurchase Invoice`
-			WHERE name NOT IN (SELECT DISTINCT parent
-			                FROM `tabeInvoicing Lifecycle Log`)
-			AND invoice_number IS NOT NULL
-			AND invoice_number != ''
-			""", as_dict=True)
+		for inv in frappe.db.sql(
+			"""
+                                 SELECT name, invoice_number
+                                 FROM `tabePurchase Invoice`
+                                 WHERE name NOT IN (SELECT DISTINCT parent
+                                                    FROM `tabeInvoicing Lifecycle Log`)
+                                   AND invoice_number IS NOT NULL
+                                   AND invoice_number != ''
+		                         """,
+			as_dict=True,
+		)
 	}
 
 	if not invoices_without_log:
@@ -1225,7 +1246,8 @@ def rebuild_lifecycle_logs():
 		return {"status": "error", "message": f"HTTP {result['status_code']}"}
 
 	flows = [
-		f for f in result["response"].get("results", [])
+		f
+		for f in result["response"].get("results", [])
 		if f.get("flowSyntax") == "CDAR" and f.get("flowType") == "SupplierInvoiceLC"
 	]
 
@@ -1255,7 +1277,6 @@ def rebuild_lifecycle_logs():
 			cdar_dict = parse_cdar(xml_result["response"])
 			invoice_number = cdar_dict.get("invoice_number", "")
 			status_code = cdar_dict.get("status_code", "")
-			status_label = cdar_dict.get("status_name", "")
 
 			if not invoice_number or not status_code:
 				skipped += 1
@@ -1272,7 +1293,9 @@ def rebuild_lifecycle_logs():
 
 			ack = flow.get("acknowledgement", {})
 			ack_status_raw = ack.get("status", "")
-			ack_status = "ok" if ack_status_raw == "Ok" else ("error" if ack_status_raw == "Error" else "pending")
+			ack_status = (
+				"ok" if ack_status_raw == "Ok" else ("error" if ack_status_raw == "Error" else "pending")
+			)
 			ack_message = (ack.get("details") or [{}])[0].get("reasonMessage", "") or None
 
 			log = frappe.new_doc("eInvoicing Lifecycle Log")
@@ -1286,6 +1309,7 @@ def rebuild_lifecycle_logs():
 			if submitted_at:
 				dt = get_datetime(submitted_at)
 				log.sent_at = dt.replace(tzinfo=None) if dt else None
+
 			log.ack_status = ack_status
 			log.error_type = "data" if ack_status == "error" else None
 			log.ack_message = ack_message
@@ -1294,7 +1318,8 @@ def rebuild_lifecycle_logs():
 
 		except Exception:
 			import traceback
-			frappe.log_error(frappe.get_traceback(), f"rebuild_lifecycle_logs — {flow.get('flowId')}")
+
+			frappe.log_error(frappe.get_traceback(), f"rebuild_lifecycle_logs - {flow.get('flowId')}")
 			errors += 1
 
 	frappe.db.commit()
@@ -1311,7 +1336,7 @@ def send_lifecycle_status(name, status_code, refusal_reasons=None):
 
 		refusal_reasons = _json.loads(refusal_reasons) if refusal_reasons else None
 	doc = frappe.get_doc("ePurchase Invoice", name)
-	return _get_provider().send_lifecycle(status_code, doc, refusal_reasons)
+	return _get_provider(doc.company).send_lifecycle(status_code, doc, refusal_reasons)
 
 
 @frappe.whitelist()
