@@ -1256,7 +1256,7 @@ async function refreshLifecycleLog(invoice) {
 			</div>
 			<div style="display: flex; align-items: center; gap: 8px">
 				<select
-					v-if="companies.length > 0"
+					v-if="companies.length > 1"
 					v-model="company"
 					class="form-control form-control-sm"
 					style="width: auto; font-size: 12px"

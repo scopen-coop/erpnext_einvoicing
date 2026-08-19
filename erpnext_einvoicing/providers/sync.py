@@ -709,12 +709,21 @@ def enrich_from_siret(name):
 		"Buying Settings", "supplier_group"
 	) or frappe.db.get_value("Supplier Group", {"is_group": 0}, "name")
 	test_supplier.tax_id = siret
-	test_supplier.categorie_comptable_tiers = "France"
+
+	def _is_custom_field_active(field):
+		if not field.is_custom_field:
+			return True
+		if field.fieldtype == "Link" and field.options:
+			return frappe.db.table_exists("tab" + field.options)
+		return True
 
 	missing_fields = [
 		field.label
 		for field in frappe.get_meta("Supplier").fields
-		if field.reqd and not test_supplier.get(field.fieldname)
+		if field.reqd
+		and not test_supplier.get(field.fieldname)
+		and not field.fieldname.startswith("custom_")
+		and _is_custom_field_active(field)
 	]
 
 	try:
