@@ -14,12 +14,13 @@ class eThirdParty(Document):
 	def _set_categorie_comptable(self):
 		"""Détermine la catégorie comptable tiers depuis le code pays si non renseignée."""
 		if self.categorie_comptable_tiers:
-			return
+			if frappe.db.exists("Categorie comptable Tiers", self.categorie_comptable_tiers):
+				return
+			self.categorie_comptable_tiers = ""
 		if not self.country_code:
 			return
-
-		code = self.country_code.upper()
-
+		if not frappe.db.table_exists("tabCategorie comptable Tiers"):
+			return
 		EU_COUNTRIES = {
 			"AT",
 			"BE",
@@ -48,10 +49,12 @@ class eThirdParty(Document):
 			"SI",
 			"SK",
 		}
-
+		code = self.country_code.upper()
 		if code == "FR":
-			self.categorie_comptable_tiers = "France"
+			cat = "France"
 		elif code in EU_COUNTRIES:
-			self.categorie_comptable_tiers = "UE"
+			cat = "UE"
 		else:
-			self.categorie_comptable_tiers = "Export"
+			cat = "Export"
+		if frappe.db.exists("Categorie comptable Tiers", cat):
+			self.categorie_comptable_tiers = cat

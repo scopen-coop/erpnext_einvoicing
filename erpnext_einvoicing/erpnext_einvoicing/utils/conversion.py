@@ -13,8 +13,8 @@ def build_purchase_invoice(epurchase_invoice):
 	pi = frappe.new_doc("Purchase Invoice")
 	pi.einvoice_source = epurchase_invoice.name
 	pi.bill_no = epurchase_invoice.invoice_number
-	pi.bill_date = epurchase_invoice.invoice_date
-	pi.due_date = epurchase_invoice.due_date
+	pi.bill_date = str(epurchase_invoice.invoice_date) if epurchase_invoice.invoice_date else None
+	pi.due_date = str(epurchase_invoice.due_date) if epurchase_invoice.due_date else None
 	pi.currency = epurchase_invoice.currency or "EUR"
 	pi.buying_price_list = (
 		frappe.db.get_single_value("Buying Settings", "buying_price_list") or "Standard Buying"

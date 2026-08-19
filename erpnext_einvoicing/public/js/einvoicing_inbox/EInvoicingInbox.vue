@@ -344,9 +344,20 @@ async function enrichFromSiret(invoice) {
 	const data = msg.data || {};
 	const missingFields = msg.missing_fields || [];
 
+	const sirenFields = [];
+	if (missingFields.length) {
+		sirenFields.push({
+			fieldtype: "HTML",
+			options: `<div class="alert alert-warning" style="padding:8px">${__(
+				"Warning: some fields need your attention: {0}",
+				[missingFields.join(", ")]
+			)}</div>`,
+		});
+	}
 	const d = new frappe.ui.Dialog({
 		title: __("Confirm Supplier Data"),
 		fields: [
+			...sirenFields,
 			{
 				fieldname: "party_name",
 				fieldtype: "Data",
@@ -368,15 +379,15 @@ async function enrichFromSiret(invoice) {
 				label: __("Country Code"),
 				default: data.country_code,
 			},
+			{ fieldname: "col", fieldtype: "Column Break" },
 			{
 				fieldname: "categorie_comptable_tiers",
 				fieldtype: "Link",
-				options: "Categorie Comptable Tiers",
+				options: "Categorie comptable Tiers",
 				label: __("Categorie Comptable Tiers"),
 				default: data.categorie_comptable_tiers,
 				reqd: 1,
 			},
-			{ fieldname: "col", fieldtype: "Column Break" },
 			{
 				fieldname: "supplier_group",
 				fieldtype: "Link",
@@ -427,20 +438,25 @@ async function enrichFromSiret(invoice) {
 		},
 	});
 
-	if (missingFields.length) {
-		d.set_intro(
-			__("Warning: some fields need your attention: {0}", [missingFields.join(", ")]),
-			"orange"
-		);
-	}
-
 	d.show();
 }
 
 function promptEditEThirdParty(invoice, ethirdparty, missingFields) {
+	const ethirdpartyFields = [];
+	if (missingFields?.length) {
+		ethirdpartyFields.push({
+			fieldtype: "HTML",
+			options: `<div class="alert alert-warning" style="padding:8px">${__(
+				"Missing required fields: {0}",
+				[missingFields.join(", ")]
+			)}</div>`,
+		});
+	}
+
 	const d = new frappe.ui.Dialog({
 		title: __("Review eThirdParty Data"),
 		fields: [
+			...ethirdpartyFields,
 			{
 				fieldname: "party_name",
 				fieldtype: "Data",
@@ -456,12 +472,21 @@ function promptEditEThirdParty(invoice, ethirdparty, missingFields) {
 				label: __("Country Code"),
 				default: ethirdparty.country_code,
 			},
+			{ fieldname: "col", fieldtype: "Column Break" },
 			{
 				fieldname: "categorie_comptable_tiers",
 				fieldtype: "Link",
-				options: "Categorie Comptable Tiers",
+				options: "Categorie comptable Tiers",
 				label: __("Categorie Comptable Tiers"),
 				default: ethirdparty.categorie_comptable_tiers,
+				reqd: 1,
+			},
+			{
+				fieldname: "supplier_group",
+				fieldtype: "Link",
+				options: "Supplier Group",
+				label: __("Supplier Group"),
+				default: ethirdparty.supplier_group,
 				reqd: 1,
 			},
 		],
@@ -475,9 +500,6 @@ function promptEditEThirdParty(invoice, ethirdparty, missingFields) {
 			await fetchInvoices(true);
 		},
 	});
-	if (missingFields?.length) {
-		d.set_intro(__("Missing required fields: {0}", [missingFields.join(", ")]), "orange");
-	}
 	d.show();
 }
 
@@ -1256,7 +1278,7 @@ async function refreshLifecycleLog(invoice) {
 			</div>
 			<div style="display: flex; align-items: center; gap: 8px">
 				<select
-					v-if="companies.length > 0"
+					v-if="companies.length > 1"
 					v-model="company"
 					class="form-control form-control-sm"
 					style="width: auto; font-size: 12px"

@@ -104,7 +104,7 @@
    "fieldname": "categorie_comptable_tiers",
    "fieldtype": "Link",
    "label": "Categorie Comptable Tiers",
-   "options": "Categorie Comptable Tiers"
+   "options": "Categorie comptable Tiers"
   },
   {
    "fieldname": "matched_party_type",
