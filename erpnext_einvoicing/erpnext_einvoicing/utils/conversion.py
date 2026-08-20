@@ -169,7 +169,7 @@ def _create_supplier_from_ethirdparty(ethirdparty_name):
 		"Buying Settings", "supplier_group"
 	) or frappe.db.get_value("Supplier Group", {"is_group": 0}, "name")
 	supplier.tax_id = ethirdparty.siret
-	supplier.categorie_comptable_tiers = ethirdparty.categorie_comptable_tiers or "France"
+	supplier.categorie_comptable_tiers = ethirdparty.categorie_comptable_tiers
 
 	if ethirdparty.zip:
 		supplier.zip = ethirdparty.zip
