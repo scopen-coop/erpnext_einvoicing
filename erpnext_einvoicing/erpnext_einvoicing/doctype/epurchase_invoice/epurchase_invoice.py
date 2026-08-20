@@ -74,15 +74,9 @@ class ePurchaseInvoice(Document):
 		)
 		if not already_sent:
 			try:
-				from erpnext_einvoicing.erpnext_einvoicing.doctype.einvoicing_settings.einvoicing_settings import (
-					get_provider,
-				)
+				from erpnext_einvoicing.providers.sync import _get_provider
 
-				settings = frappe.get_single("eInvoicing Settings")
-				if settings.approved_platform:
-					platform = frappe.get_doc("Approved Platforms", settings.approved_platform)
-					provider = get_provider(settings, platform)
-					provider.send_lifecycle("204", self)
+				_get_provider(self.company).send_lifecycle("204", self)
 			except Exception:
 				frappe.log_error(frappe.get_traceback(), f"eInvoicing lifecycle 204 — {self.name}")
 

@@ -221,11 +221,7 @@ def _parse_cii(xml_bytes: bytes):
 
 
 def _create_doc(data: dict, xml_bytes: bytes, flow_data: dict, pdf_content=None):
-	settings = frappe.get_single("eInvoicing Settings")
-
 	doc = frappe.new_doc("ePurchase Invoice")
-	doc.approved_platform = settings.approved_platform
-	doc.invoice_profile = settings.invoice_profile or "EN16931"
 	doc.conversion_status = "pending"
 	doc.supplier_match_status = "unmatched"
 	doc.flow_id = flow_data.get("flowId", "")
@@ -248,6 +244,10 @@ def _create_doc(data: dict, xml_bytes: bytes, flow_data: dict, pdf_content=None)
 		company = frappe.db.get_value("Company", {"tax_id": buyer_siret}, "name")
 		if company:
 			doc.company = company
+
+	if doc.company:
+		company_doc = frappe.get_doc("Company", doc.company)
+		doc.approved_platform = company_doc.einvoicing_approved_platform or ""
 
 	for item in data.get("items", []):
 		doc.append("items", item)
