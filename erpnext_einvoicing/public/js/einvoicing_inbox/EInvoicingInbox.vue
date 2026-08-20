@@ -18,6 +18,7 @@ const syncing = ref(false);
 const filter = ref("pending");
 const expanded = ref(new Set());
 const company = ref(frappe.boot.user.defaults.company || "");
+const defaultCompany = frappe.defaults.get_user_default("Company") || "";
 
 const switchingTab = ref(false);
 watch(filter, () => {
@@ -1091,6 +1092,10 @@ async function refreshLifecycleLog(invoice) {
 
 <template>
 	<div class="einvoicing-inbox" style="padding: 16px">
+		<div v-if="defaultCompany" style="font-size: 16px; font-weight: 600; color: #333; margin-bottom: 12px">
+			{{ __("Company") + ": " + defaultCompany }}
+		</div>
+
 		<!-- Toolbar -->
 		<div
 			style="
