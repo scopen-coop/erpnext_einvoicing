@@ -1137,6 +1137,7 @@ def sync_incoming_flows():
 			frappe.log_error(frappe.get_traceback(), f"eInvoicing scheduled sync exception - {company}")
 
 
+@frappe.whitelist()
 def poll_lifecycle_acknowledgements():
 	"""Called by scheduler"""
 	try:
@@ -1148,12 +1149,24 @@ def poll_lifecycle_acknowledgements():
 		for log in pending_logs:
 			company = frappe.db.get_value("ePurchase Invoice", log.parent, "company")
 			_poll_one_lifecycle_log(_get_provider(company), log)
+		frappe.db.commit()
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), "eInvoicing lifecycle poll exception")
 
 
 def _poll_one_lifecycle_log(provider, log):
 	try:
+		if not log.cdar_flow_id:
+			frappe.db.set_value(
+				"eInvoicing Lifecycle Log",
+				log.name,
+				{
+					"ack_status": "error",
+					"error_type": "data",
+					"ack_message": frappe._("No flow ID - CDAR was not sent successfully"),
+				},
+			)
+			return
 		result = provider.call_api(
 			f"flows/{log.cdar_flow_id}",
 			"GET",
@@ -1170,7 +1183,6 @@ def _poll_one_lifecycle_log(provider, log):
 					"ack_message": frappe._("HTTP {0}").format(result["status_code"]),
 				},
 			)
-			frappe.db.commit()
 			return
 
 		ack = result["response"].get("acknowledgement", {})
@@ -1190,7 +1202,6 @@ def _poll_one_lifecycle_log(provider, log):
 				log.name,
 				{"ack_status": "error", "error_type": "data", "ack_message": msg},
 			)
-		frappe.db.commit()
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), f"eInvoicing lifecycle poll - {log.name}")
 
@@ -1225,13 +1236,13 @@ def rebuild_lifecycle_logs():
 		inv["invoice_number"]: inv["name"]
 		for inv in frappe.db.sql(
 			"""
-                                 SELECT name, invoice_number
-                                 FROM `tabePurchase Invoice`
-                                 WHERE name NOT IN (SELECT DISTINCT parent
-                                                    FROM `tabeInvoicing Lifecycle Log`)
-                                   AND invoice_number IS NOT NULL
-                                   AND invoice_number != ''
-		                         """,
+            SELECT name, invoice_number
+            FROM `tabePurchase Invoice`
+            WHERE name NOT IN (SELECT DISTINCT parent
+                               FROM `tabeInvoicing Lifecycle Log`)
+              AND invoice_number IS NOT NULL
+              AND invoice_number != ''
+			""",
 			as_dict=True,
 		)
 	}

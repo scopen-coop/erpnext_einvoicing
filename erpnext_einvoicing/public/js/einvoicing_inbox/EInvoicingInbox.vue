@@ -807,6 +807,11 @@ async function convertToPI(invoice) {
 				5
 			);
 			await fetchInvoices(true);
+			setTimeout(async () => {
+				await fetchInvoices(true);
+				const updated = invoices.value.find((i) => i.name === invoice.name);
+				if (updated) await refreshLifecycleLog(updated);
+			}, 4000);
 		}
 	});
 }
@@ -834,6 +839,15 @@ async function convertAll() {
 				5
 			);
 			await fetchInvoices(true);
+			setTimeout(async () => {
+				await fetchInvoices(true);
+				const pending = invoices.value.filter(
+					(i) => i.last_lifecycle_log?.ack_status === "pending"
+				);
+				for (const inv of pending) {
+					await refreshLifecycleLog(inv);
+				}
+			}, 4000);
 		} finally {
 			syncing.value = false;
 		}
@@ -893,6 +907,11 @@ function promptRefuse(invoice) {
 					10
 				);
 				await fetchInvoices(true);
+				setTimeout(async () => {
+					await fetchInvoices(true);
+					const updated = invoices.value.find((i) => i.name === invoice.name);
+					if (updated) await refreshLifecycleLog(updated);
+				}, 4000);
 			} else {
 				frappe.msgprint({ message: msg.error || __("Failed"), indicator: "red" });
 			}
