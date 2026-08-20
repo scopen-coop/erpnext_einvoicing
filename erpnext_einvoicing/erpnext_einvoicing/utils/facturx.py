@@ -249,6 +249,10 @@ def _create_doc(data: dict, xml_bytes: bytes, flow_data: dict, pdf_content=None)
 		if company:
 			doc.company = company
 
+	if doc.company:
+		company_doc = frappe.get_doc("Company", doc.company)
+		doc.approved_platform = company_doc.einvoicing_approved_platform or ""
+
 	for item in data.get("items", []):
 		doc.append("items", item)
 
