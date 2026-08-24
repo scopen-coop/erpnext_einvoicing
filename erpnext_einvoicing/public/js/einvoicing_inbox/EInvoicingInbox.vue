@@ -18,6 +18,7 @@ const syncing = ref(false);
 const filter = ref("pending");
 const expanded = ref(new Set());
 const company = ref(frappe.boot.user.defaults.company || "");
+const defaultCompany = frappe.defaults.get_user_default("Company") || "";
 
 const switchingTab = ref(false);
 watch(filter, () => {
@@ -368,6 +369,7 @@ async function enrichFromSiret(invoice) {
 				label: __("Country Code"),
 				default: data.country_code,
 			},
+			{ fieldname: "col", fieldtype: "Column Break" },
 			{
 				fieldname: "categorie_comptable_tiers",
 				fieldtype: "Link",
@@ -376,7 +378,6 @@ async function enrichFromSiret(invoice) {
 				default: data.categorie_comptable_tiers,
 				reqd: 1,
 			},
-			{ fieldname: "col", fieldtype: "Column Break" },
 			{
 				fieldname: "supplier_group",
 				fieldtype: "Link",
@@ -456,12 +457,21 @@ function promptEditEThirdParty(invoice, ethirdparty, missingFields) {
 				label: __("Country Code"),
 				default: ethirdparty.country_code,
 			},
+			{ fieldname: "col", fieldtype: "Column Break" },
 			{
 				fieldname: "categorie_comptable_tiers",
 				fieldtype: "Link",
 				options: "Categorie Comptable Tiers",
 				label: __("Categorie Comptable Tiers"),
 				default: ethirdparty.categorie_comptable_tiers,
+				reqd: 1,
+			},
+			{
+				fieldname: "supplier_group",
+				fieldtype: "Link",
+				options: "Supplier Group",
+				label: __("Supplier Group"),
+				default: ethirdparty.supplier_group,
 				reqd: 1,
 			},
 		],
@@ -1091,6 +1101,13 @@ async function refreshLifecycleLog(invoice) {
 
 <template>
 	<div class="einvoicing-inbox" style="padding: 16px">
+		<div
+			v-if="defaultCompany"
+			style="font-size: 16px; font-weight: 600; color: #333; margin-bottom: 12px"
+		>
+			{{ __("Company") + ": " + defaultCompany }}
+		</div>
+
 		<!-- Toolbar -->
 		<div
 			style="
@@ -1516,9 +1533,15 @@ async function refreshLifecycleLog(invoice) {
 							<!-- eThirdParty -->
 							<template v-else-if="invoice.ethirdparty_doc">
 								<i class="fa fa-user-o" style="color: #6c757d"></i>
-								<span>{{
-									invoice.ethirdparty_doc.party_name || invoice.supplier_name_raw
-								}}</span>
+								<a
+									:href="`/app/ethirdparty/${invoice.ethirdparty_doc.name}`"
+									target="_blank"
+								>
+									<span>{{
+										invoice.ethirdparty_doc.party_name ||
+										invoice.supplier_name_raw
+									}}</span>
+								</a>
 								<button
 									v-if="invoice.ethirdparty_doc.status === 'warning'"
 									class="btn btn-xs btn-warning"
