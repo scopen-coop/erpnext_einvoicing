@@ -1133,7 +1133,10 @@ async function refreshLifecycleLog(invoice) {
 
 <template>
 	<div class="einvoicing-inbox" style="padding: 16px">
-		<div v-if="defaultCompany" style="font-size: 16px; font-weight: 600; color: #333; margin-bottom: 12px">
+		<div
+			v-if="defaultCompany"
+			style="font-size: 16px; font-weight: 600; color: #333; margin-bottom: 12px"
+		>
 			{{ __("Company") + ": " + defaultCompany }}
 		</div>
 
@@ -1562,9 +1565,15 @@ async function refreshLifecycleLog(invoice) {
 							<!-- eThirdParty -->
 							<template v-else-if="invoice.ethirdparty_doc">
 								<i class="fa fa-user-o" style="color: #6c757d"></i>
-								<span>{{
-									invoice.ethirdparty_doc.party_name || invoice.supplier_name_raw
-								}}</span>
+								<a
+									:href="`/app/ethirdparty/${invoice.ethirdparty_doc.name}`"
+									target="_blank"
+								>
+									<span>{{
+										invoice.ethirdparty_doc.party_name ||
+										invoice.supplier_name_raw
+									}}</span>
+								</a>
 								<button
 									v-if="invoice.ethirdparty_doc.status === 'warning'"
 									class="btn btn-xs btn-warning"
