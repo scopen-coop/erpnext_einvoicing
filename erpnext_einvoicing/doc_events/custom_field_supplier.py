@@ -1,0 +1,44 @@
+import frappe
+
+ORIGIN_DOCTYPE = "Supplier"
+TARGET_DOCTYPE = "eThirdParty"
+
+
+def on_create(doc, method: None):
+	if doc.dt != ORIGIN_DOCTYPE:
+		return
+
+	if doc.reqd != 1:
+		return
+
+	cf = frappe.new_doc("Custom Field")
+	cf.dt = TARGET_DOCTYPE
+	cf.fieldname = doc.fieldname
+	cf.label = doc.label
+	cf.fieldtype = doc.fieldtype
+	cf.options = doc.options  # indispensable pour Link / Select / Table
+	cf.insert_after = doc.insert_after
+	cf.reqd = 0
+	cf.default = doc.default
+	cf.description = doc.description
+	cf.hidden = doc.hidden
+	cf.read_only = doc.read_only
+
+	try:
+		cf.insert(ignore_permissions=True)
+		frappe.db.commit()
+		frappe.logger().info(f"[einvoicing] Custom Field {doc.fieldname} mirrored to {TARGET_DOCTYPE}")
+	except frappe.exceptions.ValidationError:
+		pass
+
+
+def on_delete(doc, method=None):
+	if doc.dt != ORIGIN_DOCTYPE:
+		return
+
+	mirror_name = frappe.db.get_value("Custom Field", {"dt": TARGET_DOCTYPE, "fieldname": doc.fieldname})
+	if not mirror_name:
+		return
+
+	frappe.delete_doc("Custom Field", mirror_name, ignore_permissions=True)
+	frappe.db.commit()

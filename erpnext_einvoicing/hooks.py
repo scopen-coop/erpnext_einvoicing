@@ -187,6 +187,11 @@ doctype_js = {
 # Hook on document methods and events
 
 doc_events = {
+	"Custom Field": {
+		# Supplier
+		"after_insert": "erpnext_einvoicing.doc_events.custom_field_supplier.on_create",
+		"on_trash": "erpnext_einvoicing.doc_events.custom_field_supplier.on_delete",
+	},
 	"Payment Entry": {
 		"on_submit": "erpnext_einvoicing.doc_events.payment_entry.on_submit",
 	},

@@ -355,6 +355,18 @@ async function enrichFromSiret(invoice) {
 			)}</div>`,
 		});
 	}
+
+	const customFieldsRes = await frappe.call({
+		method: "erpnext_einvoicing.providers.sync.get_mandatory_supplier_custom_fields",
+	});
+	const mandatoryCustomFields = (customFieldsRes.message || []).map((f) => ({
+		fieldname: f.fieldname,
+		fieldtype: f.fieldtype,
+		label: __(f.label),
+		options: f.options || null,
+		default: data[f.fieldname] || null,
+		reqd: 1,
+	}));
 	const d = new frappe.ui.Dialog({
 		title: __("Confirm Supplier Data"),
 		fields: [
@@ -382,20 +394,13 @@ async function enrichFromSiret(invoice) {
 			},
 			{ fieldname: "col", fieldtype: "Column Break" },
 			{
-				fieldname: "categorie_comptable_tiers",
-				fieldtype: "Link",
-				options: "Categorie comptable Tiers",
-				label: __("Categorie Comptable Tiers"),
-				default: data.categorie_comptable_tiers,
-				reqd: 1,
-			},
-			{
 				fieldname: "supplier_group",
 				fieldtype: "Link",
 				options: "Supplier Group",
 				label: __("Supplier Group"),
 				reqd: 1,
 			},
+			...mandatoryCustomFields,
 		],
 		primary_action_label: __("Save"),
 		primary_action: async (values) => {
