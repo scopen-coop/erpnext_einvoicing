@@ -7,6 +7,7 @@ import frappe
 def after_migrate():
 	_create_uom_mappings()
 	_insert_refusal_reasons()
+	_sync_supplier_custom_fields_to_ethirdparty()
 
 
 ### Private
@@ -66,3 +67,48 @@ def _insert_refusal_reasons():
 			doc.reason_label = r["reason_label"]
 			doc.insert(ignore_permissions=True)
 	frappe.db.commit()
+
+
+def _sync_supplier_custom_fields_to_ethirdparty():
+	supplier_fields = frappe.get_all(
+		"Custom Field",
+		filters={"dt": "Supplier", "reqd": 1},
+		fields=[
+			"fieldname",
+			"label",
+			"fieldtype",
+			"options",
+			"insert_after",
+			"reqd",
+			"default",
+			"description",
+			"hidden",
+			"read_only",
+		],
+	)
+
+	count = 0
+	skipped = 0
+	for row in supplier_fields:
+		cf = frappe.new_doc("Custom Field")
+		cf.dt = "eThirdParty"
+		cf.fieldname = row.fieldname
+		cf.label = row.label
+		cf.fieldtype = row.fieldtype
+		cf.options = row.options
+		cf.insert_after = row.insert_after
+		cf.reqd = 0
+		cf.default = row.default
+		cf.description = row.description
+		cf.hidden = row.hidden
+		cf.read_only = row.read_only
+
+		try:
+			cf.insert(ignore_permissions=True)
+			count += 1
+		except frappe.exceptions.ValidationError:
+			skipped += 1
+
+	if count or skipped:
+		frappe.db.commit()
+		print(f"[einvoicing] Custom Fields Supplier -> eThirdParty : {count} créé(s), {skipped} ignoré(s)")

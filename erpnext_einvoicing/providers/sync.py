@@ -669,6 +669,7 @@ def enrich_from_siret(name):
 		ethirdparty.vat_number = doc.supplier_vat or ""
 		ethirdparty.party_name = doc.supplier_name_raw or ""
 		ethirdparty.status = "pending"
+		ethirdparty.flags.ignore_mandatory = True
 		ethirdparty.insert(ignore_permissions=True)
 		doc.db_set("ethirdparty", ethirdparty.name)
 		frappe.db.commit()
@@ -755,6 +756,15 @@ def enrich_from_siret(name):
 		},
 		"missing_fields": missing_fields,
 	}
+
+
+@frappe.whitelist()
+def get_mandatory_supplier_custom_fields():
+	return frappe.get_all(
+		"Custom Field",
+		filters={"dt": "Supplier", "reqd": 1},
+		fields=["fieldname", "label", "fieldtype", "options"],
+	)
 
 
 @frappe.whitelist()
@@ -872,10 +882,10 @@ def update_ethirdparty(name, data):
 def update_item_tax_rate(name, item_idx, account_head):
 	item_idx = int(item_idx)
 	doc = frappe.get_doc("ePurchase Invoice", name)
-	tax = frappe.get_doc('Account',account_head)
+	tax = frappe.get_doc("Account", account_head)
 	for item in doc.items:
 		if item.idx == item_idx:
-			item.tax_rate = float(tax.get('tax_rate')) if tax.get('tax_rate') else 0
+			item.tax_rate = float(tax.get("tax_rate")) if tax.get("tax_rate") else 0
 			break
 	doc.save(ignore_permissions=True)
 	frappe.db.commit()

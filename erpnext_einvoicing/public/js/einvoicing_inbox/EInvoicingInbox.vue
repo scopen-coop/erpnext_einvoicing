@@ -385,6 +385,7 @@ async function enrichFromSiret(invoice) {
 				label: __("Supplier Group"),
 				reqd: 1,
 			},
+			...mandatoryCustomFields,
 		],
 		primary_action_label: __("Save"),
 		primary_action: async (values) => {
