@@ -344,7 +344,17 @@ async function enrichFromSiret(invoice) {
 	// ok ou warning -> dialog de confirmation
 	const data = msg.data || {};
 	const missingFields = msg.missing_fields || [];
-
+	const customFieldsRes = await frappe.call({
+		method: "erpnext_einvoicing.providers.sync.get_mandatory_supplier_custom_fields",
+	});
+	const mandatoryCustomFields = (customFieldsRes.message || []).map((f) => ({
+		fieldname: f.fieldname,
+		fieldtype: f.fieldtype,
+		label: __(f.label),
+		options: f.options || null,
+		default: data[f.fieldname] || null,
+		reqd: 1,
+	}));
 	const d = new frappe.ui.Dialog({
 		title: __("Confirm Supplier Data"),
 		fields: [
