@@ -47,6 +47,9 @@ fixtures = [
 			]
 		],
 	},
+	{
+		"dt": "eInvoicing Refusal Reason",
+	},
 ]
 
 # Apps
@@ -190,6 +193,7 @@ doc_events = {
 	"Custom Field": {
 		# Supplier
 		"after_insert": "erpnext_einvoicing.doc_events.custom_field_supplier.on_create",
+		"on_update": "erpnext_einvoicing.doc_events.custom_field_supplier.on_update",
 		"on_trash": "erpnext_einvoicing.doc_events.custom_field_supplier.on_delete",
 	},
 	"Payment Entry": {

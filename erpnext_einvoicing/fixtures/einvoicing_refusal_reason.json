@@ -1,0 +1,106 @@
+[
+ {
+  "docstatus": 0,
+  "doctype": "eInvoicing Refusal Reason",
+  "modified": "2026-08-17 12:11:55.551264",
+  "name": "TX_TVA_ERR",
+  "reason_code": "TX_TVA_ERR",
+  "reason_label": "Taux de TVA erroné"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "eInvoicing Refusal Reason",
+  "modified": "2026-08-17 12:11:55.562413",
+  "name": "MONTANTTOTAL_ERR",
+  "reason_code": "MONTANTTOTAL_ERR",
+  "reason_label": "Montant total erroné"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "eInvoicing Refusal Reason",
+  "modified": "2026-08-17 12:11:55.566810",
+  "name": "CALCUL_ERR",
+  "reason_code": "CALCUL_ERR",
+  "reason_label": "Erreur de calcul"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "eInvoicing Refusal Reason",
+  "modified": "2026-08-17 12:11:55.572628",
+  "name": "NON_CONFORME",
+  "reason_code": "NON_CONFORME",
+  "reason_label": "Non conforme"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "eInvoicing Refusal Reason",
+  "modified": "2026-08-17 12:11:55.578040",
+  "name": "DOUBLON",
+  "reason_code": "DOUBLON",
+  "reason_label": "Doublon"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "eInvoicing Refusal Reason",
+  "modified": "2026-08-17 12:11:55.582829",
+  "name": "DEST_ERR",
+  "reason_code": "DEST_ERR",
+  "reason_label": "Destinataire erroné"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "eInvoicing Refusal Reason",
+  "modified": "2026-08-17 12:11:55.589017",
+  "name": "TRANSAC_INC",
+  "reason_code": "TRANSAC_INC",
+  "reason_label": "Transaction incomplète"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "eInvoicing Refusal Reason",
+  "modified": "2026-08-17 12:11:55.594383",
+  "name": "EMMET_INC",
+  "reason_code": "EMMET_INC",
+  "reason_label": "Émetteur incorrect"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "eInvoicing Refusal Reason",
+  "modified": "2026-08-17 12:11:55.598929",
+  "name": "CONTRAT_TERM",
+  "reason_code": "CONTRAT_TERM",
+  "reason_label": "Contrat terminé"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "eInvoicing Refusal Reason",
+  "modified": "2026-08-17 12:11:55.604609",
+  "name": "DOUBLE_FACT",
+  "reason_code": "DOUBLE_FACT",
+  "reason_label": "Double facturation"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "eInvoicing Refusal Reason",
+  "modified": "2026-08-17 12:11:55.610139",
+  "name": "CMD_ERR",
+  "reason_code": "CMD_ERR",
+  "reason_label": "Commande erronée"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "eInvoicing Refusal Reason",
+  "modified": "2026-08-17 12:11:55.614348",
+  "name": "ADR_ERR",
+  "reason_code": "ADR_ERR",
+  "reason_label": "Adresse erronée"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "eInvoicing Refusal Reason",
+  "modified": "2026-08-17 12:11:55.619329",
+  "name": "REF_CT_ABSENT",
+  "reason_code": "REF_CT_ABSENT",
+  "reason_label": "Référence contrat absente"
+ }
+]
