@@ -1,7 +1,7 @@
 {
  "actions": [],
  "autoname": "naming_series:",
- "creation": "2026-07-30 00:00:00",
+ "creation": "2026-07-30 00:00:00.000000",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
@@ -18,6 +18,7 @@
   "city",
   "country_code",
   "column_break_official",
+  "categorie_comptable_tiers",
   "matched_party_type",
   "matched_party",
   "raw_section",
@@ -133,7 +134,7 @@
   }
  ],
  "links": [],
- "modified": "2026-08-26 12:06:01.839245",
+ "modified": "2026-07-30 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "ERPNext eInvoicing",
  "name": "eThirdParty",
@@ -162,30 +163,14 @@
    "write": 1
   }
  ],
- "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [
-  {
-   "color": "Orange",
-   "title": "pending"
-  },
-  {
-   "color": "Green",
-   "title": "ready"
-  },
-  {
-   "color": "Yellow",
-   "title": "warning"
-  },
-  {
-   "color": "Red",
-   "title": "not_found"
-  },
-  {
-   "color": "Blue",
-   "title": "converted"
-  }
+  {"color": "Orange", "title": "pending"},
+  {"color": "Green", "title": "ready"},
+  {"color": "Yellow", "title": "warning"},
+  {"color": "Red", "title": "not_found"},
+  {"color": "Blue", "title": "converted"}
  ],
  "title_field": "party_name",
  "track_changes": 1
