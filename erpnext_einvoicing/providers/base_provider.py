@@ -11,6 +11,8 @@ from frappe.utils import add_to_date, get_datetime, now_datetime
 LIFECYCLE_STATUS_MAP = {
 	"204": "Acknowledged",
 	"205": "Approved",
+	"207": "Disputed",
+	"208": "DisputeResolved",
 	"210": "Rejected",
 	"211": "PaymentTransmitted",
 }
@@ -18,6 +20,8 @@ LIFECYCLE_STATUS_MAP = {
 LIFECYCLE_STATUS_CODE_MAP = {
 	"204": "45",  # in process
 	"205": "1",  # accepted
+	"207": "46",  # disputed
+	"208": "39",  # dispute resolved
 	"210": "45",  # fallback (in process)
 	"211": "47",  # paid
 }

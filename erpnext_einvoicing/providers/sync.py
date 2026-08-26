@@ -1139,6 +1139,75 @@ def refuse_invoice(name, reason_code, reason_comment=None):
 	return {"status": "ok"}
 
 
+@frappe.whitelist()
+def get_pi_lifecycle_last_status(pi_name):
+	einvoice_name = frappe.db.get_value("ePurchase Invoice", {"purchase_invoice": pi_name}, "name")
+	if not einvoice_name:
+		return {"status_code": None, "einvoice_name": None}
+	last_log = frappe.get_all(
+		"eInvoicing Lifecycle Log",
+		filters={"parent": einvoice_name},
+		fields=["status_code"],
+		order_by="sent_at desc",
+		limit=1,
+	)
+	return {
+		"status_code": last_log[0]["status_code"] if last_log else None,
+		"einvoice_name": einvoice_name,
+	}
+
+
+@frappe.whitelist()
+def send_invoice_dispute(pi_name, reason_code, reason_comment=None):
+	einvoice_name = frappe.db.get_value("ePurchase Invoice", {"purchase_invoice": pi_name}, "name")
+	if not einvoice_name:
+		frappe.throw(frappe._("No ePurchase Invoice linked to {0}.").format(pi_name))
+	last_log = frappe.get_all(
+		"eInvoicing Lifecycle Log",
+		filters={"parent": einvoice_name},
+		fields=["status_code"],
+		order_by="sent_at desc",
+		limit=1,
+	)
+	last_status = last_log[0]["status_code"] if last_log else None
+	if last_status in ("207", "208"):
+		frappe.throw(frappe._("Cannot send dispute: current status is already {0}.").format(last_status))
+	refusal_reasons = [{"MDT-113": reason_code}]
+	if reason_comment:
+		refusal_reasons[0]["MDT-126"] = reason_comment
+	einvoice = frappe.get_doc("ePurchase Invoice", einvoice_name)
+	try:
+		_get_provider(einvoice.company).send_lifecycle("207", einvoice, refusal_reasons)
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), f"eInvoicing lifecycle 207 - PI {pi_name}")
+		frappe.throw(frappe._("Failed to send dispute to platform."))
+	return {"status": "ok"}
+
+
+@frappe.whitelist()
+def send_dispute_resolved(pi_name):
+	einvoice_name = frappe.db.get_value("ePurchase Invoice", {"purchase_invoice": pi_name}, "name")
+	if not einvoice_name:
+		frappe.throw(frappe._("No ePurchase Invoice linked to {0}.").format(pi_name))
+	last_log = frappe.get_all(
+		"eInvoicing Lifecycle Log",
+		filters={"parent": einvoice_name},
+		fields=["status_code"],
+		order_by="sent_at desc",
+		limit=1,
+	)
+	last_status = last_log[0]["status_code"] if last_log else None
+	if last_status not in ("207", "209"):
+		frappe.throw(frappe._("Cannot resolve dispute: current status is {0}.").format(last_status))
+	einvoice = frappe.get_doc("ePurchase Invoice", einvoice_name)
+	try:
+		_get_provider(einvoice.company).send_lifecycle("208", einvoice)
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), f"eInvoicing lifecycle 208 - PI {pi_name}")
+		frappe.throw(frappe._("Failed to send dispute resolution to platform."))
+	return {"status": "ok"}
+
+
 ### Scheduled task
 
 

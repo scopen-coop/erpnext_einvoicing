@@ -96,6 +96,7 @@ required_apps = ["frappe", "erpnext"]
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
 doctype_js = {
 	"Company": "public/js/company.js",
+	"Purchase Invoice": "public/js/purchase_invoice.js",
 }
 
 # Svg Icons
