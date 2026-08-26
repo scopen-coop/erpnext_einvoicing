@@ -292,3 +292,4 @@ Convert all {0} ready invoice(s)?,Convertir les {0} facture(s) prête(s) ?,
 Converting...,Conversion en cours...,
 No flow ID returned by platform,Aucun identifiant de flux retourné par la plateforme,
 No flow ID - CDAR was not sent successfully,Aucun identifiant de flux - le CDAR n'a pas été envoyé correctement,
+No Approved Platform configured for company '{0}'.,Pas de PA configuré pour la société '{0}'.
