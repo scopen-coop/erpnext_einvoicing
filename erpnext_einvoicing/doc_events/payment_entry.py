@@ -18,7 +18,7 @@ def on_submit(doc, method):
 			{"parent": einvoice_name, "status_code": "211", "ack_status": "ok"},
 		)
 		if already_sent:
-			return
+			continue
 
 		try:
 			from erpnext_einvoicing.providers.sync import _get_provider

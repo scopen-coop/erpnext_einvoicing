@@ -7,6 +7,12 @@ def on_submit(doc, method):
 	einvoice_name = frappe.db.get_value("ePurchase Invoice", {"purchase_invoice": doc.name}, "name")
 	if not einvoice_name:
 		return
+	already_sent = frappe.db.exists(
+		"eInvoicing Lifecycle Log",
+		{"parent": einvoice_name, "status_code": "205", "ack_status": "ok"},
+	)
+	if already_sent:
+		return
 	try:
 		from erpnext_einvoicing.providers.sync import _get_provider
 
