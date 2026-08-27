@@ -47,6 +47,7 @@ fixtures = [
 			]
 		],
 	},
+	{"dt": "eInvoicing Refusal Reason"},
 ]
 
 # Apps
