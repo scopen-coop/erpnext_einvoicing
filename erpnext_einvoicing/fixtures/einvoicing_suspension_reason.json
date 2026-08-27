@@ -1,0 +1,58 @@
+[
+ {
+  "docstatus": 0,
+  "doctype": "eInvoicing Suspension Reason",
+  "modified": "2026-08-27 16:48:51.509886",
+  "name": "JUSTIF_ABS",
+  "reason_code": "JUSTIF_ABS",
+  "reason_label": "Justificatif absent"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "eInvoicing Suspension Reason",
+  "modified": "2026-08-27 16:48:51.547438",
+  "name": "COORD_BANC_ERR",
+  "reason_code": "COORD_BANC_ERR",
+  "reason_label": "Coordonnées bancaires erronées"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "eInvoicing Suspension Reason",
+  "modified": "2026-08-27 16:48:51.548904",
+  "name": "CMD_ERR",
+  "reason_code": "CMD_ERR",
+  "reason_label": "Commande erronée"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "eInvoicing Suspension Reason",
+  "modified": "2026-08-27 16:48:51.560103",
+  "name": "SIRET_ERR",
+  "reason_code": "SIRET_ERR",
+  "reason_label": "SIRET erroné"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "eInvoicing Suspension Reason",
+  "modified": "2026-08-27 16:48:51.561855",
+  "name": "CODE_ROUTAGE_ERR",
+  "reason_code": "CODE_ROUTAGE_ERR",
+  "reason_label": "Code de routage erroné"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "eInvoicing Suspension Reason",
+  "modified": "2026-08-27 16:48:51.563111",
+  "name": "REF_CT_ABSENT",
+  "reason_code": "REF_CT_ABSENT",
+  "reason_label": "Référence contrat absente"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "eInvoicing Suspension Reason",
+  "modified": "2026-08-27 16:48:51.564071",
+  "name": "REF_ERR",
+  "reason_code": "REF_ERR",
+  "reason_label": "Référence erronée"
+ }
+]

@@ -1,0 +1,28 @@
+{
+ "autoname": "field:reason_code",
+ "creation": "2026-08-27 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": ["reason_code", "reason_label"],
+ "fields": [
+  {
+   "fieldname": "reason_code",
+   "fieldtype": "Data",
+   "label": "Reason Code",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "reason_label",
+   "fieldtype": "Data",
+   "label": "Reason Label",
+   "in_list_view": 1
+  }
+ ],
+ "modified": "2026-08-27 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "ERPNext eInvoicing",
+ "name": "eInvoicing Suspension Reason",
+ "owner": "Administrator",
+ "track_changes": 0
+}
