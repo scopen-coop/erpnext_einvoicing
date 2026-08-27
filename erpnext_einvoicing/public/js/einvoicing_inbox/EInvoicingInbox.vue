@@ -9,6 +9,11 @@ function __(text, replace) {
 	return text;
 }
 
+const CCT_DOCTYPE =
+	parseInt((frappe.boot.versions?.frappe || "16").split(".")[0]) >= 16
+		? "Categorie Comptable Tiers"
+		: "Categorie comptable Tiers";
+
 /*** State ***/
 const pendingFlows = ref(0);
 const pendingFlowsStatus = ref("ok");
@@ -383,7 +388,7 @@ async function enrichFromSiret(invoice) {
 			{
 				fieldname: "categorie_comptable_tiers",
 				fieldtype: "Link",
-				options: "Categorie Comptable Tiers",
+				options: CCT_DOCTYPE,
 				label: __("Categorie Comptable Tiers"),
 				default: data.categorie_comptable_tiers,
 				reqd: 1,
@@ -472,7 +477,7 @@ function promptEditEThirdParty(invoice, ethirdparty, missingFields) {
 			{
 				fieldname: "categorie_comptable_tiers",
 				fieldtype: "Link",
-				options: "Categorie Comptable Tiers",
+				options: CCT_DOCTYPE,
 				label: __("Categorie Comptable Tiers"),
 				default: ethirdparty.categorie_comptable_tiers,
 				reqd: 1,

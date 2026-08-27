@@ -1139,14 +1139,29 @@ def get_pi_lifecycle_last_status(pi_name):
 		limit=1,
 	)
 	if not last_log:
-		return {"status_code": None, "ack_status": None, "status_label": None, "einvoice_name": einvoice_name}
+		return {
+			"status_code": None,
+			"ack_status": None,
+			"status_label": None,
+			"effective_status": None,
+			"einvoice_name": einvoice_name,
+		}
 	log = last_log[0]
+	effective_log = frappe.get_all(
+		"eInvoicing Lifecycle Log",
+		filters={"parent": einvoice_name, "ack_status": ["!=", "error"]},
+		fields=["status_code"],
+		order_by="sent_at desc",
+		limit=1,
+	)
+	effective_status = effective_log[0]["status_code"] if effective_log else None
 	return {
 		"status_code": log["status_code"],
 		"status_label": log["status_label"],
 		"ack_status": log["ack_status"],
 		"error_type": log.get("error_type"),
 		"log_name": log["name"],
+		"effective_status": effective_status,
 		"einvoice_name": einvoice_name,
 	}
 
