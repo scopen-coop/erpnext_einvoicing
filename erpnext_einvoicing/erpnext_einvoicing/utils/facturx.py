@@ -31,14 +31,18 @@ XmlFormat = Literal["facturx", "ubl"]
 ### Public entry point
 
 
-def create_e_purchase_invoice(pdf_content: bytes, flow_data: dict):
-	"""
-	Main entry point called by EsalinkProvider._process_flow.
-	Extracts XML from PDF, parses it, creates and returns an ePurchase Invoice.
-	"""
+def create_e_purchase_invoice(pdf_content, flow_data):
 	xml_bytes = _extract_xml_from_pdf(pdf_content)
-	xml_format = _detect_xml_format(xml_bytes)
+	return create_e_purchase_invoice_from_xml(xml_bytes, flow_data, pdf_content=pdf_content)
 
+
+def create_e_purchase_invoice_from_xml(xml_content, flow_data, pdf_content=None):
+	if isinstance(xml_content, str):
+		xml_bytes = xml_content.encode("utf-8")
+	else:
+		xml_bytes = xml_content
+
+	xml_format = _detect_xml_format(xml_bytes)
 	if xml_format == "ubl":
 		frappe.throw(
 			frappe._("UBL format is not yet supported for incoming invoices."),
@@ -407,11 +411,11 @@ def _auto_match_po(doc):
 		for line in po_lines:
 			billed_qty = frappe.db.sql(
 				"""
-                                       SELECT COALESCE(SUM(qty), 0)
-                                       FROM `tabPurchase Invoice Item`
-                                       WHERE po_detail = %s
-                                         AND docstatus = 1
-			                           """,
+                SELECT COALESCE(SUM(qty), 0)
+                FROM `tabPurchase Invoice Item`
+                WHERE po_detail = %s
+                  AND docstatus = 1
+				""",
 				line.name,
 			)[0][0]
 			remaining_qty = line.qty - billed_qty
@@ -488,11 +492,11 @@ def _auto_match_pr(doc):
 		for line in pr_lines:
 			billed_qty = frappe.db.sql(
 				"""
-                                       SELECT COALESCE(SUM(qty), 0)
-                                       FROM `tabPurchase Invoice Item`
-                                       WHERE pr_detail = %s
-                                         AND docstatus = 1
-			                           """,
+                SELECT COALESCE(SUM(qty), 0)
+                FROM `tabPurchase Invoice Item`
+                WHERE pr_detail = %s
+                  AND docstatus = 1
+				""",
 				line.name,
 			)[0][0]
 			remaining_qty = line.qty - billed_qty
