@@ -327,7 +327,6 @@ def get_einvoicing_inbox(date_from=None, date_to=None, company=None):
 					"zip",
 					"city",
 					"country_code",
-					"categorie_comptable_tiers",
 				],
 				as_dict=True,
 			)
@@ -743,6 +742,12 @@ def enrich_from_siret(name):
 		}
 
 	status = "warning" if missing_fields else "ok"
+	mandatory_custom_fieldnames = frappe.get_all(
+		"Custom Field",
+		filters={"dt": "Supplier", "reqd": 1},
+		pluck="fieldname",
+	)
+	custom_data = {f: ethirdparty.get(f) for f in mandatory_custom_fieldnames}
 	return {
 		"status": status,
 		"data": {
@@ -752,7 +757,7 @@ def enrich_from_siret(name):
 			"zip": ethirdparty.zip,
 			"city": ethirdparty.city,
 			"country_code": ethirdparty.country_code,
-			"categorie_comptable_tiers": ethirdparty.categorie_comptable_tiers,
+			**custom_data,
 		},
 		"missing_fields": missing_fields,
 	}
