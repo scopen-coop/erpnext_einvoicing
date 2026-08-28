@@ -17,10 +17,16 @@ def _get_provider(company=None):
 	platform = frappe.get_doc("Approved Platforms", company_doc.einvoicing_approved_platform)
 	if not platform.is_enabled:
 		frappe.throw(frappe._("Platform '{0}' is disabled.").format(platform.name))
+
 	if platform.provider_type == "Esalink":
 		from erpnext_einvoicing.providers.esalink_provider import EsalinkProvider
 
 		return EsalinkProvider(platform, company_doc)
+	if platform.provider_type == "SuperPDP":
+		from erpnext_einvoicing.providers.super_pdp_provider import SuperPdpProvider
+
+		return SuperPdpProvider(platform, company_doc)
+
 	frappe.throw(
 		frappe._("Unsupported provider type: '{0}'.").format(platform.provider_type),
 		title=frappe._("Configuration Error"),
@@ -71,12 +77,6 @@ def check_pending_flows(sync_type="Purchase Invoice", company=None):
 def sync_flows(sync_type="Purchase Invoice", company=None):
 	frappe.only_for("System Manager")
 	return _get_provider(company).sync_flows(sync_type)
-
-
-@frappe.whitelist()
-def send_sample_invoice():
-	frappe.only_for("System Manager")
-	return _get_provider().send_sample_invoice()
 
 
 ### Inbox whitelisted methods

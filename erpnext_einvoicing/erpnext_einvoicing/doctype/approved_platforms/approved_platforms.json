@@ -41,7 +41,7 @@
    "fieldname": "provider_type",
    "fieldtype": "Select",
    "label": "Provider Type",
-   "options": "Esalink",
+   "options": "Esalink\nSuperPDP",
    "reqd": 1,
    "in_list_view": 1
   },
