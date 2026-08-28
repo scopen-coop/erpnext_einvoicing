@@ -350,6 +350,7 @@ async function enrichFromSiret(invoice) {
 	// ok ou warning -> dialog de confirmation
 	const data = msg.data || {};
 	const missingFields = msg.missing_fields || [];
+
 	const supportsSetIntro = typeof frappe.ui.Dialog.prototype.set_intro === "function";
 	const sirenFields = [];
 	if (missingFields.length && !supportsSetIntro) {
@@ -361,6 +362,7 @@ async function enrichFromSiret(invoice) {
 			)}</div>`,
 		});
 	}
+
 	const customFieldsRes = await frappe.call({
 		method: "erpnext_einvoicing.providers.sync.get_mandatory_supplier_custom_fields",
 	});
@@ -510,9 +512,11 @@ function promptEditEThirdParty(invoice, ethirdparty, missingFields) {
 			await fetchInvoices(true);
 		},
 	});
+
 	if (missingFields?.length && supportsSetIntro) {
 		d.set_intro(__("Missing required fields: {0}", [missingFields.join(", ")]), "orange");
 	}
+
 	d.show();
 }
 

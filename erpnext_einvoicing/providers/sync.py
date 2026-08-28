@@ -1358,6 +1358,7 @@ def _poll_one_lifecycle_log(provider, log):
 
 		ack = result["response"].get("acknowledgement", {})
 		ack_status = ack.get("status", "")
+
 		if ack_status == "Ok":
 			frappe.db.set_value(
 				"eInvoicing Lifecycle Log",
