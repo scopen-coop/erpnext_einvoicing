@@ -308,6 +308,7 @@ Failed to send dispute to platform.,Échec de l'envoi du litige à la plateforme
 Failed to send dispute resolution to platform.,Échec de l'envoi de la résolution à la plateforme.,
 Disputed,Litige,
 DisputeResolved,Litige résolu,
+Suspended,Suspendu,
 Retry,Réessayer,
 Retrying...,Renvoi en cours...,
 Lifecycle status resent,Statut CDAR renvoyé,

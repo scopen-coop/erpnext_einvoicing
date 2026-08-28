@@ -793,6 +793,7 @@ def save_ethirdparty(invoice_name, data, supplier_group, apply_to_all=0):
 	ethirdparty.city = data.get("city", "")
 	ethirdparty.country_code = data.get("country_code", "")
 	ethirdparty.categorie_comptable_tiers = data.get("categorie_comptable_tiers", "")
+
 	mandatory_custom_fields = frappe.get_all(
 		"Custom Field",
 		filters={"dt": "Supplier", "reqd": 1},
@@ -801,6 +802,7 @@ def save_ethirdparty(invoice_name, data, supplier_group, apply_to_all=0):
 	for fieldname in mandatory_custom_fields:
 		if fieldname in data:
 			ethirdparty.set(fieldname, data[fieldname])
+
 	ethirdparty.status = "ready"
 	ethirdparty.save(ignore_permissions=True)
 	frappe.db.commit()
@@ -1353,6 +1355,7 @@ def _poll_one_lifecycle_log(provider, log):
 				},
 			)
 			return
+
 		ack = result["response"].get("acknowledgement", {})
 		ack_status = ack.get("status", "")
 		if ack_status == "Ok":
