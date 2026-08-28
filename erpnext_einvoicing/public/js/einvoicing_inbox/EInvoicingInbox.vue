@@ -495,14 +495,6 @@ function promptEditEThirdParty(invoice, ethirdparty, missingFields) {
 			},
 			{ fieldname: "col", fieldtype: "Column Break" },
 			{
-				fieldname: "categorie_comptable_tiers",
-				fieldtype: "Link",
-				options: CCT_DOCTYPE,
-				label: __("Categorie Comptable Tiers"),
-				default: ethirdparty.categorie_comptable_tiers,
-				reqd: 1,
-			},
-			{
 				fieldname: "supplier_group",
 				fieldtype: "Link",
 				options: "Supplier Group",
