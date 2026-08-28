@@ -805,9 +805,6 @@ def save_ethirdparty(invoice_name, data, supplier_group, apply_to_all=0):
 
 	ethirdparty.status = "ready"
 	ethirdparty.save(ignore_permissions=True)
-
-	ethirdparty.status = "ready"
-	ethirdparty.save(ignore_permissions=True)
 	frappe.db.commit()
 
 	doc.db_set("ethirdparty", ethirdparty.name)
@@ -1239,6 +1236,7 @@ def send_invoice_suspend(pi_name, reason_code, reason_comment=None):
 	einvoice_name = frappe.db.get_value("ePurchase Invoice", {"purchase_invoice": pi_name}, "name")
 	if not einvoice_name:
 		frappe.throw(frappe._("No ePurchase Invoice linked to {0}.").format(pi_name))
+
 	last_log = frappe.get_all(
 		"eInvoicing Lifecycle Log",
 		filters={"parent": einvoice_name},
@@ -1340,6 +1338,7 @@ def _poll_one_lifecycle_log(provider, log):
 				},
 			)
 			return
+
 		result = provider.call_api(
 			f"flows/{log.cdar_flow_id}",
 			"GET",

@@ -47,9 +47,7 @@ fixtures = [
 			]
 		],
 	},
-	{
-		"dt": "eInvoicing Refusal Reason",
-	},
+	{"dt": "eInvoicing Refusal Reason"},
 	{"dt": "eInvoicing Suspension Reason"},
 ]
 

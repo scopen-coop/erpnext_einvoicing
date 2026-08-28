@@ -9,6 +9,7 @@ frappe.ui.form.on("Purchase Invoice", {
 });
 
 /*** Lifecycle buttons ***/
+
 function _load_einvoicing_buttons(frm) {
 	frappe.call({
 		method: "erpnext_einvoicing.providers.sync.get_pi_lifecycle_last_status",
@@ -138,7 +139,6 @@ function _retry(frm, info) {
 	});
 }
 
-/*** Dispute ***/
 function _prompt_dispute(frm) {
 	frappe.prompt(
 		[
@@ -195,7 +195,6 @@ function _confirm_resolve(frm) {
 	});
 }
 
-/*** Suspend ***/
 function _prompt_suspend(frm) {
 	frappe.prompt(
 		[

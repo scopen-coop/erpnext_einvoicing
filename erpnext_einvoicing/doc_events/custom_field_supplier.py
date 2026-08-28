@@ -1,3 +1,6 @@
+# Copyright (c) 2026, Scopen and contributors
+# For license information, please see license.txt
+
 import frappe
 
 ORIGIN_DOCTYPE = "Supplier"
@@ -16,7 +19,7 @@ def on_create(doc, method=None):
 	cf.fieldname = doc.fieldname
 	cf.label = doc.label
 	cf.fieldtype = doc.fieldtype
-	cf.options = doc.options  # indispensable pour Link / Select / Table
+	cf.options = doc.options
 	cf.insert_after = "matched_party"
 	cf.reqd = 0
 	cf.default = doc.default

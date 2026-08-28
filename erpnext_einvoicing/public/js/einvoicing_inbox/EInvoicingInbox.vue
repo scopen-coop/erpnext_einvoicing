@@ -11,7 +11,7 @@ function __(text, replace) {
 
 /*** Constants ***/
 const CCT_DOCTYPE =
-	parseInt((frappe.boot.versions?.frappe || "15").split(".")[0]) >= 16
+	parseInt((frappe.boot.versions?.frappe || "16").split(".")[0]) >= 16
 		? "Categorie Comptable Tiers"
 		: "Categorie comptable Tiers";
 
