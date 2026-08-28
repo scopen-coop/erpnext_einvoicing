@@ -12,7 +12,7 @@ LIFECYCLE_STATUS_MAP = {
 	"204": "Acknowledged",
 	"205": "Approved",
 	"207": "Disputed",
-	"208": "DisputeResolved",
+	"208": "Suspended",
 	"210": "Rejected",
 	"211": "PaymentTransmitted",
 }
@@ -264,6 +264,16 @@ class BaseProvider(ABC):
 			log.error_type = None if cdar_flow_id else "platform"
 			log.ack_message = None if cdar_flow_id else frappe._("No flow ID returned by platform")
 			log.insert(ignore_permissions=True)
+
+			logs_ordered = frappe.get_all(
+				"eInvoicing Lifecycle Log",
+				filters={"parent": einvoice_name},
+				fields=["name", "sent_at"],
+				order_by="sent_at asc",
+			)
+			for i, l in enumerate(logs_ordered, start=1):
+				frappe.db.set_value("eInvoicing Lifecycle Log", l["name"], "idx", i)
+
 			frappe.db.commit()
 		except Exception:
 			frappe.log_error(

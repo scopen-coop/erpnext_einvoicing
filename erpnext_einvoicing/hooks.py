@@ -50,6 +50,7 @@ fixtures = [
 	{
 		"dt": "eInvoicing Refusal Reason",
 	},
+	{"dt": "eInvoicing Suspension Reason"},
 ]
 
 # Apps

@@ -9,6 +9,12 @@ function __(text, replace) {
 	return text;
 }
 
+/*** Constants ***/
+const CCT_DOCTYPE =
+	parseInt((frappe.boot.versions?.frappe || "15").split(".")[0]) >= 16
+		? "Categorie Comptable Tiers"
+		: "Categorie comptable Tiers";
+
 /*** State ***/
 const pendingFlows = ref(0);
 const pendingFlowsStatus = ref("ok");
@@ -345,8 +351,9 @@ async function enrichFromSiret(invoice) {
 	const data = msg.data || {};
 	const missingFields = msg.missing_fields || [];
 
+	const supportsSetIntro = typeof frappe.ui.Dialog.prototype.set_intro === "function";
 	const sirenFields = [];
-	if (missingFields.length) {
+	if (missingFields.length && !supportsSetIntro) {
 		sirenFields.push({
 			fieldtype: "HTML",
 			options: `<div class="alert alert-warning" style="padding:8px">${__(
@@ -444,12 +451,20 @@ async function enrichFromSiret(invoice) {
 		},
 	});
 
+	if (missingFields.length && supportsSetIntro) {
+		d.set_intro(
+			__("Warning: some fields need your attention: {0}", [missingFields.join(", ")]),
+			"orange"
+		);
+	}
+
 	d.show();
 }
 
 function promptEditEThirdParty(invoice, ethirdparty, missingFields) {
+	const supportsSetIntro = typeof frappe.ui.Dialog.prototype.set_intro === "function";
 	const ethirdpartyFields = [];
-	if (missingFields?.length) {
+	if (missingFields?.length && !supportsSetIntro) {
 		ethirdpartyFields.push({
 			fieldtype: "HTML",
 			options: `<div class="alert alert-warning" style="padding:8px">${__(
@@ -482,7 +497,7 @@ function promptEditEThirdParty(invoice, ethirdparty, missingFields) {
 			{
 				fieldname: "categorie_comptable_tiers",
 				fieldtype: "Link",
-				options: "Categorie comptable Tiers",
+				options: CCT_DOCTYPE,
 				label: __("Categorie Comptable Tiers"),
 				default: ethirdparty.categorie_comptable_tiers,
 				reqd: 1,
@@ -506,6 +521,11 @@ function promptEditEThirdParty(invoice, ethirdparty, missingFields) {
 			await fetchInvoices(true);
 		},
 	});
+
+	if (missingFields?.length && supportsSetIntro) {
+		d.set_intro(__("Missing required fields: {0}", [missingFields.join(", ")]), "orange");
+	}
+
 	d.show();
 }
 
@@ -813,11 +833,6 @@ async function convertToPI(invoice) {
 				5
 			);
 			await fetchInvoices(true);
-			setTimeout(async () => {
-				await fetchInvoices(true);
-				const updated = invoices.value.find((i) => i.name === invoice.name);
-				if (updated) await refreshLifecycleLog(updated);
-			}, 4000);
 		}
 	});
 }
@@ -845,15 +860,6 @@ async function convertAll() {
 				5
 			);
 			await fetchInvoices(true);
-			setTimeout(async () => {
-				await fetchInvoices(true);
-				const pending = invoices.value.filter(
-					(i) => i.last_lifecycle_log?.ack_status === "pending"
-				);
-				for (const inv of pending) {
-					await refreshLifecycleLog(inv);
-				}
-			}, 4000);
 		} finally {
 			syncing.value = false;
 		}
@@ -913,11 +919,6 @@ function promptRefuse(invoice) {
 					10
 				);
 				await fetchInvoices(true);
-				setTimeout(async () => {
-					await fetchInvoices(true);
-					const updated = invoices.value.find((i) => i.name === invoice.name);
-					if (updated) await refreshLifecycleLog(updated);
-				}, 4000);
 			} else {
 				frappe.msgprint({ message: msg.error || __("Failed"), indicator: "red" });
 			}
