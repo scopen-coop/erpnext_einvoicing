@@ -792,7 +792,6 @@ def save_ethirdparty(invoice_name, data, supplier_group, apply_to_all=0):
 	ethirdparty.zip = data.get("zip", "")
 	ethirdparty.city = data.get("city", "")
 	ethirdparty.country_code = data.get("country_code", "")
-	ethirdparty.categorie_comptable_tiers = data.get("categorie_comptable_tiers", "")
 
 	mandatory_custom_fields = frappe.get_all(
 		"Custom Field",
