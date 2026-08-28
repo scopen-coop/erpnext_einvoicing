@@ -169,8 +169,15 @@ def _create_supplier_from_ethirdparty(ethirdparty_name):
 		"Buying Settings", "supplier_group"
 	) or frappe.db.get_value("Supplier Group", {"is_group": 0}, "name")
 	supplier.tax_id = ethirdparty.siret
-	supplier.categorie_comptable_tiers = ethirdparty.categorie_comptable_tiers
-
+	mandatory_custom_fields = frappe.get_all(
+		"Custom Field",
+		filters={"dt": "Supplier", "reqd": 1},
+		pluck="fieldname",
+	)
+	for fieldname in mandatory_custom_fields:
+		value = ethirdparty.get(fieldname)
+		if value:
+			supplier.set(fieldname, value)
 	if ethirdparty.zip:
 		supplier.zip = ethirdparty.zip
 	if ethirdparty.city:
