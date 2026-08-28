@@ -473,6 +473,7 @@ function promptEditEThirdParty(invoice, ethirdparty, missingFields) {
 			)}</div>`,
 		});
 	}
+
 	const d = new frappe.ui.Dialog({
 		title: __("Review eThirdParty Data"),
 		fields: [
