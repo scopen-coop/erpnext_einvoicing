@@ -9,6 +9,7 @@ function __(text, replace) {
 	return text;
 }
 
+/*** Constants ***/
 const CCT_DOCTYPE =
 	parseInt((frappe.boot.versions?.frappe || "16").split(".")[0]) >= 16
 		? "Categorie Comptable Tiers"
@@ -349,6 +350,17 @@ async function enrichFromSiret(invoice) {
 	// ok ou warning -> dialog de confirmation
 	const data = msg.data || {};
 	const missingFields = msg.missing_fields || [];
+	const supportsSetIntro = typeof frappe.ui.Dialog.prototype.set_intro === "function";
+	const sirenFields = [];
+	if (missingFields.length && !supportsSetIntro) {
+		sirenFields.push({
+			fieldtype: "HTML",
+			options: `<div class="alert alert-warning" style="padding:8px">${__(
+				"Warning: some fields need your attention: {0}",
+				[missingFields.join(", ")]
+			)}</div>`,
+		});
+	}
 	const customFieldsRes = await frappe.call({
 		method: "erpnext_einvoicing.providers.sync.get_mandatory_supplier_custom_fields",
 	});
@@ -363,6 +375,7 @@ async function enrichFromSiret(invoice) {
 	const d = new frappe.ui.Dialog({
 		title: __("Confirm Supplier Data"),
 		fields: [
+			...sirenFields,
 			{
 				fieldname: "party_name",
 				fieldtype: "Data",
@@ -385,14 +398,6 @@ async function enrichFromSiret(invoice) {
 				default: data.country_code,
 			},
 			{ fieldname: "col", fieldtype: "Column Break" },
-			{
-				fieldname: "categorie_comptable_tiers",
-				fieldtype: "Link",
-				options: CCT_DOCTYPE,
-				label: __("Categorie Comptable Tiers"),
-				default: data.categorie_comptable_tiers,
-				reqd: 1,
-			},
 			{
 				fieldname: "supplier_group",
 				fieldtype: "Link",
@@ -444,7 +449,7 @@ async function enrichFromSiret(invoice) {
 		},
 	});
 
-	if (missingFields.length) {
+	if (missingFields.length && supportsSetIntro) {
 		d.set_intro(
 			__("Warning: some fields need your attention: {0}", [missingFields.join(", ")]),
 			"orange"
@@ -455,9 +460,21 @@ async function enrichFromSiret(invoice) {
 }
 
 function promptEditEThirdParty(invoice, ethirdparty, missingFields) {
+	const supportsSetIntro = typeof frappe.ui.Dialog.prototype.set_intro === "function";
+	const ethirdpartyFields = [];
+	if (missingFields?.length && !supportsSetIntro) {
+		ethirdpartyFields.push({
+			fieldtype: "HTML",
+			options: `<div class="alert alert-warning" style="padding:8px">${__(
+				"Missing required fields: {0}",
+				[missingFields.join(", ")]
+			)}</div>`,
+		});
+	}
 	const d = new frappe.ui.Dialog({
 		title: __("Review eThirdParty Data"),
 		fields: [
+			...ethirdpartyFields,
 			{
 				fieldname: "party_name",
 				fieldtype: "Data",
@@ -474,14 +491,6 @@ function promptEditEThirdParty(invoice, ethirdparty, missingFields) {
 				default: ethirdparty.country_code,
 			},
 			{ fieldname: "col", fieldtype: "Column Break" },
-			{
-				fieldname: "categorie_comptable_tiers",
-				fieldtype: "Link",
-				options: CCT_DOCTYPE,
-				label: __("Categorie Comptable Tiers"),
-				default: ethirdparty.categorie_comptable_tiers,
-				reqd: 1,
-			},
 			{
 				fieldname: "supplier_group",
 				fieldtype: "Link",
@@ -501,7 +510,7 @@ function promptEditEThirdParty(invoice, ethirdparty, missingFields) {
 			await fetchInvoices(true);
 		},
 	});
-	if (missingFields?.length) {
+	if (missingFields?.length && supportsSetIntro) {
 		d.set_intro(__("Missing required fields: {0}", [missingFields.join(", ")]), "orange");
 	}
 	d.show();

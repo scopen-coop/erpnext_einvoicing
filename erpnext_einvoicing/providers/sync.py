@@ -1337,6 +1337,7 @@ def _poll_one_lifecycle_log(provider, log):
 				},
 			)
 			return
+
 		result = provider.call_api(
 			f"flows/{log.cdar_flow_id}",
 			"GET",
