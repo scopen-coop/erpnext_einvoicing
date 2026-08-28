@@ -35,8 +35,6 @@ fixtures = [
 					"Company-einvoicing_recreate_token",
 					"Company-einvoicing_delete_token",
 					"Company-einvoicing_rebuild_lifecycle_logs",
-					"Company-einvoicing_po_required",
-					"Company-einvoicing_pr_required",
 					"Company-einvoicing_auto_sync",
 					"Company-einvoicing_tab",
 					"Company-einvoicing_platform_section",

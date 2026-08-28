@@ -83,16 +83,43 @@ def send_sample_invoice():
 
 
 @frappe.whitelist()
-def get_buying_settings(company=None):
-	if not company:
-		company = frappe.defaults.get_user_default("company")
-	if not company:
-		return {"po_required": False, "pr_required": False}
-	company_doc = frappe.get_doc("Company", company)
+def get_buying_settings():
+	buying_settings = frappe.get_single("Buying Settings")
 	return {
-		"po_required": bool(company_doc.einvoicing_po_required),
-		"pr_required": bool(company_doc.einvoicing_pr_required),
+		"po_required": buying_settings.po_required == "Yes",
+		"pr_required": buying_settings.pr_required == "Yes",
 	}
+
+
+@frappe.whitelist()
+def convert_ethirdparty_for_po(name):
+	from erpnext_einvoicing.erpnext_einvoicing.utils.conversion import _create_supplier_from_ethirdparty
+
+	doc = frappe.get_doc("ePurchase Invoice", name)
+	if not doc.ethirdparty:
+		return {"status": "error", "error": "No eThirdParty linked to this invoice"}
+	try:
+		supplier_name = _create_supplier_from_ethirdparty(doc.ethirdparty)
+		doc.db_set("matched_supplier", supplier_name)
+		doc.db_set("supplier_match_status", "matched")
+		doc.reload()
+		doc._update_conversion_status()
+		doc.db_set("conversion_status", doc.conversion_status)
+		frappe.db.commit()
+		items = [
+			{
+				"item_code": item.matched_item,
+				"qty": item.qty,
+				"uom": item.uom,
+				"rate": item.unit_price,
+			}
+			for item in doc.items
+			if item.match_status == "matched" and item.matched_item
+		]
+		return {"status": "ok", "supplier": supplier_name, "items": items}
+	except Exception:
+		frappe.log_error(frappe.get_traceback(), "convert_ethirdparty_for_po")
+		return {"status": "error", "error": frappe.get_last_doc("Error Log").error}
 
 
 @frappe.whitelist()
@@ -812,7 +839,17 @@ def save_ethirdparty(invoice_name, data, supplier_group, apply_to_all=0):
 	frappe.db.commit()
 
 	doc.db_set("ethirdparty", ethirdparty.name)
-	frappe.db.set_value("ePurchase Invoice", invoice_name, "sirene_status", "ok")
+	frappe.db.set_value(
+		"ePurchase Invoice",
+		invoice_name,
+		{
+			"sirene_status": "ok",
+			"supplier_match_status": "ethirdparty",
+		},
+	)
+	doc.reload()
+	doc._update_conversion_status()
+	doc.db_set("conversion_status", doc.conversion_status)
 
 	from erpnext_einvoicing.erpnext_einvoicing.utils.facturx import _auto_match_items
 
