@@ -11,6 +11,7 @@
   "unit_price",
   "amount",
   "tax_rate",
+  "tax_account_head",
   "column_break_match",
   "match_status",
   "matched_item",
@@ -63,6 +64,13 @@
    "fieldname": "tax_rate",
    "fieldtype": "Percent",
    "label": "Tax Rate (%)"
+  },
+  {
+   "fieldname": "tax_account_head",
+   "fieldtype": "Link",
+   "label": "Tax Account",
+   "options": "Account",
+   "read_only": 1
   },
   {
    "fieldname": "column_break_match",
