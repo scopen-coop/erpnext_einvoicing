@@ -140,34 +140,39 @@ def _resolve_uom(uom_code):
 
 
 def _build_taxes(epurchase_invoice, pi):
-	"""Ajoute une ligne de taxe par taux distinct basé sur les comptes de la société."""
+	"""Ajoute une ligne de taxe par compte distinct basé sur tax_account_head ou lookup par taux."""
 	tax_groups = {}
 	for item in epurchase_invoice.items:
 		if not item.tax_rate:
 			continue
 		rate = round(float(item.tax_rate), 1)
-		tax_groups[rate] = tax_groups.get(rate, 0) + float(item.amount or 0)
-
-	for rate, base_amount in tax_groups.items():
-		account = frappe.db.get_value(
-			"Account",
-			{
-				"company": pi.company,
-				"account_type": "Tax",
-				"tax_rate": rate,
-				"root_type": "Asset",
-			},
-			"name",
-		)
+		account = item.get("tax_account_head") or None
+		if not account:
+			account = frappe.db.get_value(
+				"Account",
+				{
+					"company": pi.company,
+					"account_type": "Tax",
+					"tax_rate": rate,
+					"root_type": "Asset",
+				},
+				"name",
+			)
 		if not account:
 			continue
+		key = account
+		if key not in tax_groups:
+			tax_groups[key] = {"rate": rate, "base_amount": 0}
+		tax_groups[key]["base_amount"] += float(item.amount or 0)
+
+	for account, data in tax_groups.items():
 		pi.append(
 			"taxes",
 			{
 				"charge_type": "Actual",
 				"account_head": account,
-				"description": f"TVA {rate}%",
-				"tax_amount": round(base_amount * rate / 100, 2),
+				"description": f"TVA {data['rate']}%",
+				"tax_amount": round(data["base_amount"] * data["rate"] / 100, 2),
 			},
 		)
 

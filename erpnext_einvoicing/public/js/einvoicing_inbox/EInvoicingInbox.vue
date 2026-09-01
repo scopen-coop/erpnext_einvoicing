@@ -162,7 +162,7 @@ async function fetchInvoices(silent = false) {
 				company: company.value,
 			},
 		});
-		invoices.value = res.message || [];
+		invoices.value = JSON.parse(JSON.stringify(res.message || []));
 	} finally {
 		if (!silent) {
 			loading.value = false;
@@ -762,15 +762,46 @@ function editItemTaxRate(invoice, item) {
 			},
 		],
 		async (values) => {
-			await frappe.call({
-				method: "erpnext_einvoicing.providers.sync.update_item_tax_rate",
+			const doUpdate = async (apply_to_all) => {
+				await frappe.call({
+					method: "erpnext_einvoicing.providers.sync.update_item_tax_rate",
+					args: {
+						name: invoice.name,
+						item_idx: item.idx,
+						account_head: values.account_head,
+						apply_to_all,
+					},
+				});
+				await fetchInvoices(true);
+			};
+
+			if (!invoice.matched_supplier) {
+				await doUpdate(0);
+				return;
+			}
+
+			const tax_rate = item.tax_rate;
+			const siblings = await frappe.call({
+				method: "erpnext_einvoicing.providers.sync.count_similar_tax_items",
 				args: {
 					name: invoice.name,
-					item_idx: item.idx,
-					account_head: values.account_head,
+					tax_rate: item.tax_rate,
 				},
 			});
-			await fetchInvoices(true);
+			const count = siblings.message?.count || 0;
+
+			if (count > 0) {
+				frappe.confirm(
+					__(
+						"Apply this tax account to {0} other item(s) with the same supplier and tax rate?",
+						[count]
+					),
+					() => doUpdate(1),
+					() => doUpdate(0)
+				);
+			} else {
+				await doUpdate(0);
+			}
 		},
 		__("Edit Tax Account"),
 		__("Save")
@@ -1905,7 +1936,7 @@ async function refreshLifecycleLog(invoice) {
 										>
 										<span v-else>{{ __("No tax") }}</span>
 										<i
-											v-if="!isLocked(invoice)"
+											v-if="!isLocked(invoice) && supplierReady(invoice)"
 											class="fa fa-pencil"
 											style="cursor: pointer; margin-left: 6px"
 											@click="editItemTaxRate(invoice, item)"

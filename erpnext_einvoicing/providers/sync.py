@@ -298,6 +298,7 @@ def get_einvoicing_inbox(date_from=None, date_to=None, company=None):
 				"unit_price",
 				"amount",
 				"tax_rate",
+				"tax_account_head",
 				"match_status",
 				"matched_item",
 				"purchase_order",
@@ -331,7 +332,11 @@ def get_einvoicing_inbox(date_from=None, date_to=None, company=None):
 
 		company = inv.get("company")
 		for item in inv["items"]:
-			if item.get("tax_rate") and company:
+			if item.get("tax_account_head"):
+				item["tax_account_name"] = frappe.db.get_value(
+					"Account", item["tax_account_head"], "account_name"
+				)
+			elif item.get("tax_rate") and company:
 				item["tax_account_name"] = frappe.db.get_value(
 					"Account",
 					{
@@ -942,17 +947,75 @@ def update_ethirdparty(name, data):
 
 
 @frappe.whitelist()
-def update_item_tax_rate(name, item_idx, account_head):
+def update_item_tax_rate(name, item_idx, account_head, apply_to_all=0):
+	apply_to_all = frappe.utils.cint(apply_to_all)
 	item_idx = int(item_idx)
+	if not account_head:
+		return {"status": "error", "error": "No account selected"}
+	tax_rate = float(frappe.db.get_value("Account", account_head, "tax_rate") or 0)
 	doc = frappe.get_doc("ePurchase Invoice", name)
-	tax = frappe.get_doc("Account", account_head)
 	for item in doc.items:
 		if item.idx == item_idx:
-			item.tax_rate = float(tax.get("tax_rate")) if tax.get("tax_rate") else 0
+			item.tax_rate = tax_rate
+			item.tax_account_head = account_head
 			break
 	doc.save(ignore_permissions=True)
+
+	if apply_to_all:
+		supplier = doc.matched_supplier
+		if supplier:
+			all_invoices = frappe.get_all(
+				"ePurchase Invoice",
+				filters={
+					"matched_supplier": supplier,
+					"conversion_status": ["!=", "converted"],
+				},
+				pluck="name",
+			)
+			other_items = frappe.get_all(
+				"ePurchase Invoice Item",
+				filters={
+					"tax_rate": tax_rate,
+					"parent": ["in", all_invoices],
+				},
+				fields=["name"],
+			)
+			for row in other_items:
+				frappe.db.set_value(
+					"ePurchase Invoice Item",
+					row.name,
+					{
+						"tax_account_head": account_head,
+					},
+				)
+
 	frappe.db.commit()
 	return {"status": "ok"}
+
+
+@frappe.whitelist()
+def count_similar_tax_items(name, tax_rate):
+	supplier = frappe.db.get_value("ePurchase Invoice", name, "matched_supplier")
+	if not supplier:
+		return {"count": 0}
+	invoices = frappe.get_all(
+		"ePurchase Invoice",
+		filters={
+			"matched_supplier": supplier,
+			"conversion_status": ["!=", "converted"],
+		},
+		pluck="name",
+	)
+	if not invoices:
+		return {"count": 0}
+	count = frappe.db.count(
+		"ePurchase Invoice Item",
+		{
+			"parent": ["in", invoices],
+			"tax_rate": float(tax_rate),
+		},
+	)
+	return {"count": count}
 
 
 @frappe.whitelist()
