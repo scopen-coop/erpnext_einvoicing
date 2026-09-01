@@ -57,6 +57,37 @@ const counts = computed(() => ({
 	refused: invoices.value.filter((i) => i.conversion_status === "refused").length,
 }));
 
+const groupedInvoices = computed(() => {
+	const result = [];
+	const childNames = new Set(
+		filtered.value
+			.filter((i) => i.is_credit_note && i.referenced_epurchase_invoice)
+			.map((i) => i.name)
+	);
+	for (const inv of filtered.value) {
+		if (childNames.has(inv.name)) continue;
+		result.push({ ...inv, _indent: false });
+		const children = filtered.value.filter(
+			(i) => i.is_credit_note && i.referenced_epurchase_invoice === inv.name
+		);
+		for (const child of children) {
+			result.push({ ...child, _indent: true });
+		}
+	}
+	// Orphan CN
+	for (const inv of filtered.value) {
+		if (inv.is_credit_note && inv.referenced_epurchase_invoice) {
+			const parentInList = filtered.value.some(
+				(i) => i.name === inv.referenced_epurchase_invoice
+			);
+			if (!parentInList && !result.find((i) => i.name === inv.name)) {
+				result.push({ ...inv, _indent: false });
+			}
+		}
+	}
+	return result;
+});
+
 /*** Date picker ***/
 const showDatePicker = ref(false);
 const datePreset = ref("all");
@@ -823,6 +854,7 @@ async function createItem(invoice, item) {
 }
 
 function canConvert(invoice) {
+	if (invoice.is_credit_note && creditNoteBlockReason(invoice) !== null) return false;
 	if (invoice.conversion_status !== "ready") return false;
 	if (buyingSettings.value.po_required) {
 		const hasPO =
@@ -909,6 +941,21 @@ async function cancelConversion(invoice) {
 }
 
 function promptRefuse(invoice) {
+	if (invoice.is_credit_note) {
+		const ref_status = invoice.ref_status;
+		if (
+			!invoice.referenced_epurchase_invoice ||
+			ref_status === "pending" ||
+			ref_status === "ready"
+		) {
+			frappe.msgprint({
+				message: creditNoteBlockReason(invoice),
+				indicator: "orange",
+				title: __("Action not allowed"),
+			});
+			return;
+		}
+	}
 	frappe.prompt(
 		[
 			{
@@ -1109,6 +1156,22 @@ async function unlinkItemPR(invoice, item) {
 		args: { name: invoice.name, item_idx: item.idx },
 	});
 	await fetchInvoices(true);
+}
+
+function creditNoteBlockReason(invoice) {
+	if (!invoice.is_credit_note) return null;
+	const ref_status = invoice.ref_status;
+	if (!invoice.referenced_epurchase_invoice)
+		return __("Referenced invoice not found - cannot process this credit note");
+	if (ref_status === "refused")
+		return __("Referenced invoice {0} was refused - you must refuse this credit note", [
+			invoice.referenced_invoice_number,
+		]);
+	if (ref_status === "pending" || ref_status === "ready")
+		return __("Referenced invoice {0} must be accepted before processing this credit note", [
+			invoice.referenced_invoice_number,
+		]);
+	return null;
 }
 
 /*** Lifecycle ***/
@@ -1417,15 +1480,31 @@ async function refreshLifecycleLog(invoice) {
 			style="position: relative"
 		>
 			<div
-				v-for="invoice in filtered"
+				v-for="invoice in groupedInvoices"
 				:key="invoice.name"
-				style="
+				:style="`
+					position: relative;
 					border: 1px solid #d1d8dd;
+					border-left: 3px solid ${invoice.is_credit_note ? '#5bc0de' : '#d1d8dd'};
+					margin-left: ${invoice._indent ? '32px' : '0'};
 					border-radius: 6px;
 					margin-bottom: 12px;
 					background: #fff;
-				"
+				`"
 			>
+				<div
+					v-if="invoice._indent"
+					style="
+						position: absolute;
+						left: -20px;
+						top: 5%;
+						transform: translateY(-50%);
+						color: #5bc0de;
+						font-size: 14px;
+					"
+				>
+					<i class="fa fa-level-up fa-rotate-90"></i>
+				</div>
 				<!-- Card header -->
 				<div
 					style="
@@ -1443,6 +1522,13 @@ async function refreshLifecycleLog(invoice) {
 						>
 							{{ invoice.name }}
 						</a>
+						<span
+							v-if="invoice.is_credit_note"
+							class="indicator-pill blue"
+							style="font-size: 11px"
+						>
+							{{ __("Credit Note") }}
+						</span>
 						<a
 							v-if="invoice.pdf_url"
 							:href="invoice.pdf_url"
@@ -1741,7 +1827,7 @@ async function refreshLifecycleLog(invoice) {
 				</div>
 
 				<!-- Items section -->
-				<div style="padding: 0; background: #fbfbfb; border-left: 2px solid #5bc0de">
+				<div style="padding: 0; background: #fafafa">
 					<div
 						style="
 							display: flex;
@@ -2117,35 +2203,48 @@ async function refreshLifecycleLog(invoice) {
 						padding: 10px 16px;
 						border-top: 1px solid #f0f0f0;
 						display: flex;
-						justify-content: space-between;
-						align-items: center;
+						flex-direction: column;
+						gap: 8px;
 					"
 				>
-					<button class="btn btn-sm btn-danger" @click="promptRefuse(invoice)">
-						<i class="fa fa-ban"></i> {{ __("Refuse") }}
-					</button>
-					<div>
-						<span
-							v-if="!canConvert(invoice) && invoice.conversion_status === 'ready'"
-							style="color: #888; font-size: 12px; margin-right: 8px"
-						>
-							<i class="fa fa-exclamation-triangle"></i>
-							{{
-								buyingSettings.po_required &&
-								!invoice.purchase_order &&
-								!invoice.items?.some((i) => i.purchase_order)
-									? __("Purchase Order required")
-									: __("Purchase Receipt required")
-							}}
-						</span>
-						<button
-							v-if="canConvert(invoice)"
-							class="btn btn-sm btn-primary"
-							@click="convertToPI(invoice)"
-						>
-							{{ __("Convert to Purchase Invoice") }}
-							<i class="fa fa-arrow-circle-o-right"></i>
+					<div
+						v-if="invoice.is_credit_note && creditNoteBlockReason(invoice)"
+						style="color: #888; font-size: 12px"
+					>
+						<i class="fa fa-exclamation-triangle" style="color: #f0ad4e"></i>
+						{{ creditNoteBlockReason(invoice) }}
+					</div>
+					<div
+						style="display: flex; justify-content: space-between; align-items: center"
+					>
+						<button class="btn btn-sm btn-danger" @click="promptRefuse(invoice)">
+							<i class="fa fa-ban"></i> {{ __("Refuse") }}
 						</button>
+						<div>
+							<span
+								v-if="
+									!canConvert(invoice) && invoice.conversion_status === 'ready'
+								"
+								style="color: #888; font-size: 12px; margin-right: 8px"
+							>
+								<i class="fa fa-exclamation-triangle"></i>
+								{{
+									buyingSettings.po_required &&
+									!invoice.purchase_order &&
+									!invoice.items?.some((i) => i.purchase_order)
+										? __("Purchase Order required")
+										: __("Purchase Receipt required")
+								}}
+							</span>
+							<button
+								v-if="canConvert(invoice)"
+								class="btn btn-sm btn-primary"
+								@click="convertToPI(invoice)"
+							>
+								{{ __("Convert to Purchase Invoice") }}
+								<i class="fa fa-arrow-circle-o-right"></i>
+							</button>
+						</div>
 					</div>
 				</div>
 

@@ -26,6 +26,9 @@
   "ethirdparty",
   "invoice_section",
   "invoice_number",
+  "is_credit_note",
+  "referenced_invoice_number",
+  "referenced_epurchase_invoice",
   "invoice_date",
   "due_date",
   "column_break_invoice",
@@ -186,6 +189,28 @@
    "label": "Supplier Invoice No.",
    "read_only": 1,
    "in_list_view": 1
+  },
+  {
+   "fieldname": "is_credit_note",
+   "fieldtype": "Check",
+   "label": "Is Credit Note",
+   "read_only": 1,
+   "insert_after": "invoice_number"
+  },
+  {
+   "fieldname": "referenced_invoice_number",
+   "fieldtype": "Data",
+   "label": "Referenced Invoice Number",
+   "read_only": 1,
+   "insert_after": "is_credit_note"
+  },
+  {
+   "fieldname": "referenced_epurchase_invoice",
+   "fieldtype": "Link",
+   "label": "Referenced ePurchase Invoice",
+   "options": "ePurchase Invoice",
+   "read_only": 1,
+   "insert_after": "referenced_invoice_number"
   },
   {
    "fieldname": "invoice_date",
