@@ -751,6 +751,7 @@ function editItemTaxRate(invoice, item) {
 				fieldtype: "Link",
 				options: "Account",
 				label: __("Tax Account"),
+				reqd: 1,
 				default: item.tax_account_head || "",
 				get_query: () => ({
 					filters: {
