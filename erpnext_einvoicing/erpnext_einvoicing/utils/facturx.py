@@ -119,6 +119,15 @@ def _parse_cii(xml_bytes: bytes):
 
 	### Header
 	invoice_number = get("//rsm:ExchangedDocument/ram:ID/text()")
+	type_code = get("//rsm:ExchangedDocument/ram:TypeCode/text()")
+	is_credit_note = type_code == "381"
+	referenced_invoice_number = get(
+		"//rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement"
+		"/ram:BuyerOrderReferencedDocument/ram:IssuerAssignedID/text()"
+	) or get(
+		"//rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement"
+		"/ram:InvoiceReferencedDocument/ram:IssuerAssignedID/text()"
+	)
 	invoice_date = _parse_cii_date(get("//rsm:ExchangedDocument/ram:IssueDateTime/udt:DateTimeString/text()"))
 
 	### Seller
@@ -206,6 +215,8 @@ def _parse_cii(xml_bytes: bytes):
 
 	return {
 		"invoice_number": invoice_number,
+		"is_credit_note": is_credit_note,
+		"referenced_invoice_number": referenced_invoice_number,
 		"invoice_date": invoice_date,
 		"due_date": due_date,
 		"currency": currency,
@@ -231,6 +242,16 @@ def _create_doc(data: dict, xml_bytes: bytes, flow_data: dict, pdf_content=None)
 	doc.flow_id = flow_data.get("flowId", "")
 
 	doc.invoice_number = data.get("invoice_number")
+	doc.is_credit_note = 1 if data.get("is_credit_note") else 0
+	doc.referenced_invoice_number = data.get("referenced_invoice_number") or ""
+	if doc.referenced_invoice_number:
+		ref_epinvoice = frappe.db.get_value(
+			"ePurchase Invoice",
+			{"invoice_number": doc.referenced_invoice_number},
+			"name",
+		)
+		if ref_epinvoice:
+			doc.referenced_epurchase_invoice = ref_epinvoice
 	doc.invoice_date = data.get("invoice_date")
 	doc.due_date = data.get("due_date")
 	doc.currency = data.get("currency") or "EUR"

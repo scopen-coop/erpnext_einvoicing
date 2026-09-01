@@ -60,6 +60,19 @@ def build_purchase_invoice(epurchase_invoice):
 	_build_taxes(epurchase_invoice, pi)
 
 	pi.insert(ignore_permissions=True)
+
+	if epurchase_invoice.is_credit_note:
+		ref_pi = None
+		if epurchase_invoice.referenced_epurchase_invoice:
+			ref_pi = frappe.db.get_value(
+				"ePurchase Invoice",
+				epurchase_invoice.referenced_epurchase_invoice,
+				"purchase_invoice",
+			)
+		pi.is_return = 1
+		if ref_pi:
+			pi.return_against = ref_pi
+
 	epurchase_invoice.db_set("purchase_invoice", pi.name)
 
 	attachments = frappe.get_all(

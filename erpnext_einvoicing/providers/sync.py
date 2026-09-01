@@ -278,6 +278,9 @@ def get_einvoicing_inbox(date_from=None, date_to=None, company=None):
 			"purchase_invoice",
 			"company",
 			"buyer_siret",
+			"is_credit_note",
+			"referenced_invoice_number",
+			"referenced_epurchase_invoice",
 		],
 		order_by="creation desc",
 	)
@@ -357,6 +360,15 @@ def get_einvoicing_inbox(date_from=None, date_to=None, company=None):
 				],
 				as_dict=True,
 			)
+
+		if inv.get("is_credit_note") and inv.get("referenced_epurchase_invoice"):
+			inv["ref_status"] = frappe.db.get_value(
+				"ePurchase Invoice",
+				inv["referenced_epurchase_invoice"],
+				"conversion_status",
+			)
+		else:
+			inv["ref_status"] = None
 
 	return invoices
 
@@ -1765,3 +1777,23 @@ def unlink_item_pr(name, item_idx):
 	doc.db_set("conversion_status", doc.conversion_status)
 	frappe.db.commit()
 	return {"status": "ok"}
+
+
+@frappe.whitelist()
+def get_credit_note_status(name):
+	doc = frappe.get_doc("ePurchase Invoice", name)
+	if not doc.is_credit_note:
+		return {"is_credit_note": 0}
+	ref_status = None
+	if doc.referenced_epurchase_invoice:
+		ref_status = frappe.db.get_value(
+			"ePurchase Invoice",
+			doc.referenced_epurchase_invoice,
+			"conversion_status",
+		)
+	return {
+		"is_credit_note": 1,
+		"referenced_invoice_number": doc.referenced_invoice_number,
+		"referenced_epurchase_invoice": doc.referenced_epurchase_invoice,
+		"ref_status": ref_status,
+	}
