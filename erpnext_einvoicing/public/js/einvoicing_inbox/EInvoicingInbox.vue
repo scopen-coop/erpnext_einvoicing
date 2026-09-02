@@ -62,6 +62,7 @@ const groupedInvoices = computed(() => {
 	const childNames = new Set(
 		filtered.value
 			.filter((i) => i.is_credit_note && i.referenced_epurchase_invoice)
+			.filter((i) => filtered.value.some((p) => p.name === i.referenced_epurchase_invoice))
 			.map((i) => i.name)
 	);
 	for (const inv of filtered.value) {
@@ -353,22 +354,27 @@ async function enrichFromSiret(invoice) {
 	const msg = r.message || {};
 
 	if (msg.status === "not_found") {
-		frappe.show_alert({ message: __("No company found for this SIRET"), indicator: "red" }, 5);
-		frappe.ui.form.make_quick_entry(
-			"Supplier",
-			async (doc) => {
-				await frappe.call({
-					method: "erpnext_einvoicing.providers.sync.match_supplier",
-					args: { name: invoice.name, matched_supplier: doc.name },
-				});
-				await fetchInvoices(true);
-			},
-			null,
-			{
-				supplier_name: invoice.supplier_name_raw,
-				tax_id: invoice.supplier_siret,
-			}
+		frappe.show_alert(
+			{ message: __("No company found for this SIRET"), indicator: "orange" },
+			5
 		);
+		const data = msg.data || {};
+		frappe.ui.form.make_quick_entry("Supplier", async (doc) => {
+			await frappe.call({
+				method: "erpnext_einvoicing.providers.sync.match_supplier",
+				args: { name: invoice.name, matched_supplier: doc.name },
+			});
+			await fetchInvoices(true);
+		});
+		setTimeout(() => {
+			const dialog = frappe.quick_entry?.dialog;
+			if (dialog) {
+				dialog.set_value("supplier_name", data.party_name || invoice.supplier_name_raw);
+				dialog.set_value("tax_id", data.siret || invoice.supplier_siret);
+				dialog.set_value("siret", data.siret || invoice.supplier_siret);
+				dialog.set_value("siren", (data.siret || invoice.supplier_siret)?.substring(0, 9));
+			}
+		}, 300);
 		return;
 	}
 
@@ -2248,7 +2254,17 @@ async function refreshLifecycleLog(invoice) {
 					<div
 						style="display: flex; justify-content: space-between; align-items: center"
 					>
-						<button class="btn btn-sm btn-danger" @click="promptRefuse(invoice)">
+						<button
+							v-if="
+								!(
+									invoice.is_credit_note &&
+									creditNoteBlockReason(invoice) &&
+									invoice.ref_status !== 'refused'
+								)
+							"
+							class="btn btn-sm btn-danger"
+							@click="promptRefuse(invoice)"
+						>
 							<i class="fa fa-ban"></i> {{ __("Refuse") }}
 						</button>
 						<div>

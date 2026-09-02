@@ -18,6 +18,7 @@
   "supplier_name_raw",
   "supplier_siret",
   "supplier_vat",
+  "supplier_uriid",
   "supplier_address_raw",
   "column_break_supplier",
   "supplier_match_status",
@@ -135,6 +136,13 @@
    "fieldtype": "Data",
    "label": "VAT Number",
    "read_only": 1
+  },
+  {
+   "fieldname": "supplier_uriid",
+   "fieldtype": "Data",
+   "label": "Supplier Routing ID",
+   "read_only": 1,
+   "insert_after": "supplier_vat"
   },
   {
    "fieldname": "supplier_address_raw",

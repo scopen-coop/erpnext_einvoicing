@@ -52,6 +52,7 @@ function _load_einvoicing_buttons(frm) {
 					color: ${textColor};
 					background: ${color};
 					vertical-align: middle;
+					min-width: 160px;
 				"><i class="fa ${icon}"></i>${label}</span>`);
 				if (ack_status === "error") {
 					const $retry = $(

@@ -196,6 +196,13 @@ def _create_supplier_from_ethirdparty(ethirdparty_name):
 		value = ethirdparty.get(fieldname)
 		if value:
 			supplier.set(fieldname, value)
+
+	if "erpnext_france" in frappe.get_installed_apps():
+		for fieldname in ("siret", "siren", "code_naf", "legal_form"):
+			value = ethirdparty.get(fieldname)
+			if value:
+				supplier.set(fieldname, value)
+
 	if ethirdparty.zip:
 		supplier.zip = ethirdparty.zip
 	if ethirdparty.city:

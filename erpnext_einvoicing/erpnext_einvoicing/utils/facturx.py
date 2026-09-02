@@ -137,6 +137,7 @@ def _parse_cii(xml_bytes: bytes):
 		f"{seller_base}/ram:SpecifiedTaxRegistration[ram:ID/@schemeID='0002']/ram:ID/text()"
 	)
 	supplier_vat = get(f"{seller_base}/ram:SpecifiedTaxRegistration[ram:ID/@schemeID='VA']/ram:ID/text()")
+	supplier_uriid = get(f"{seller_base}/ram:URIUniversalCommunication/ram:URIID/text()")
 
 	address_parts = [
 		get(f"{seller_base}/ram:PostalTradeAddress/ram:LineOne/text()"),
@@ -223,6 +224,7 @@ def _parse_cii(xml_bytes: bytes):
 		"supplier_name_raw": supplier_name,
 		"supplier_siret": supplier_siret,
 		"supplier_vat": supplier_vat,
+		"supplier_uriid": supplier_uriid,
 		"supplier_address_raw": supplier_address,
 		"buyer_siret": buyer_siret,
 		"total_ht": total_ht,
@@ -258,6 +260,7 @@ def _create_doc(data: dict, xml_bytes: bytes, flow_data: dict, pdf_content=None)
 	doc.supplier_name_raw = data.get("supplier_name_raw")
 	doc.supplier_siret = data.get("supplier_siret")
 	doc.supplier_vat = data.get("supplier_vat")
+	doc.supplier_uriid = data.get("supplier_uriid") or ""
 	doc.supplier_address_raw = data.get("supplier_address_raw")
 	doc.total_ht = data.get("total_ht", 0)
 	doc.total_vat = data.get("total_vat", 0)

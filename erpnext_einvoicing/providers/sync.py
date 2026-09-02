@@ -713,9 +713,6 @@ def enrich_from_siret(name):
 		ethirdparty.party_name = doc.supplier_name_raw or ""
 		ethirdparty.status = "pending"
 		ethirdparty.flags.ignore_mandatory = True
-		ethirdparty.insert(ignore_permissions=True)
-		doc.db_set("ethirdparty", ethirdparty.name)
-		frappe.db.commit()
 
 	try:
 		response = req.get(
@@ -732,8 +729,16 @@ def enrich_from_siret(name):
 	if not results:
 		frappe.db.set_value("ePurchase Invoice", name, "sirene_status", "not_found")
 		frappe.db.commit()
-		return {"status": "not_found"}
+		return {
+			"status": "not_found",
+			"data": {
+				"siret": siret,
+				"party_name": doc.supplier_name_raw or "",
+				"vat_number": doc.supplier_vat or "",
+			},
+		}
 
+	is_new = ethirdparty.is_new()
 	company = results[0]
 	siege = company.get("siege", {})
 
@@ -744,8 +749,22 @@ def enrich_from_siret(name):
 	ethirdparty.country_code = "FR"
 	ethirdparty.sirene_raw = frappe.as_json(company)
 
+	if "erpnext_france" in frappe.get_installed_apps():
+		siren = company.get("siren", siret[:9])
+		code_naf = siege.get("activite_principale", "") or company.get("activite_principale", "")
+		legal_form = company.get("nature_juridique", "")
+		for fieldname, value in (
+			("siret", siret),
+			("siren", siren),
+			("code_naf", code_naf),
+			("legal_form", legal_form),
+		):
+			if value:
+				ethirdparty.set(fieldname, value)
+	else:
+		siren = code_naf = legal_form = ""
+
 	### Dry-run validation
-	import json as _json
 
 	test_supplier = frappe.new_doc("Supplier")
 	test_supplier.supplier_name = ethirdparty.party_name
@@ -775,25 +794,31 @@ def enrich_from_siret(name):
 	except Exception as e:
 		missing_fields.append(str(e))
 
-	if missing_fields:
-		ethirdparty.status = "warning"
-		ethirdparty.save(ignore_permissions=True)
-		frappe.db.commit()
-		return {
-			"status": "warning",
-			"ethirdparty": ethirdparty.as_dict(),
-			"missing_fields": missing_fields,
-		}
-
-	status = "warning" if missing_fields else "ok"
 	mandatory_custom_fieldnames = frappe.get_all(
 		"Custom Field",
 		filters={"dt": "Supplier", "reqd": 1},
 		pluck="fieldname",
 	)
 	custom_data = {f: ethirdparty.get(f) for f in mandatory_custom_fieldnames}
+
+	extra_data = (
+		{"siren": siren, "code_naf": code_naf, "legal_form": legal_form}
+		if siren or code_naf or legal_form
+		else {}
+	)
+
+	if missing_fields:
+		ethirdparty.status = "warning"
+
+	if is_new:
+		ethirdparty.insert(ignore_permissions=True)
+		doc.db_set("ethirdparty", ethirdparty.name)
+	else:
+		ethirdparty.save(ignore_permissions=True)
+	frappe.db.commit()
+
 	return {
-		"status": status,
+		"status": "warning" if missing_fields else "ok",
 		"data": {
 			"siret": siret,
 			"party_name": ethirdparty.party_name,
@@ -801,6 +826,7 @@ def enrich_from_siret(name):
 			"zip": ethirdparty.zip,
 			"city": ethirdparty.city,
 			"country_code": ethirdparty.country_code,
+			**extra_data,
 			**custom_data,
 		},
 		"missing_fields": missing_fields,
@@ -850,6 +876,12 @@ def save_ethirdparty(invoice_name, data, supplier_group, apply_to_all=0):
 	for fieldname in mandatory_custom_fields:
 		if fieldname in data:
 			ethirdparty.set(fieldname, data[fieldname])
+
+	if "erpnext_france" in frappe.get_installed_apps():
+		for fieldname in ("siret", "siren", "code_naf", "legal_form"):
+			value = data.get(fieldname)
+			if value:
+				ethirdparty.set(fieldname, value)
 
 	ethirdparty.status = "ready"
 	ethirdparty.save(ignore_permissions=True)
