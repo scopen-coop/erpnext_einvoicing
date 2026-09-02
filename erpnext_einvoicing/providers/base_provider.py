@@ -368,7 +368,7 @@ class BaseProvider(ABC):
 	def _build_cdar_data_dict(self, status_code, doc, refusal_reasons=None):
 		now = datetime.datetime.now()
 		buyer_siret = (doc.buyer_siret or "").replace(" ", "")
-		supplier_siret = (doc.supplier_siret or "").replace(" ", "")
+		supplier_siret = (doc.supplier_siret or doc.supplier_siren or "").replace(" ", "")
 
 		if not buyer_siret:
 			frappe.throw(
@@ -377,7 +377,7 @@ class BaseProvider(ABC):
 			)
 		if not supplier_siret:
 			frappe.throw(
-				frappe._("Cannot send lifecycle: no supplier SIRET on {0}.").format(doc.name),
+				frappe._("Cannot send lifecycle: no supplier SIRET or SIREN on {0}.").format(doc.name),
 				title=frappe._("Lifecycle Error"),
 			)
 
@@ -435,6 +435,7 @@ class BaseProvider(ABC):
 			cdar_dict["MDG-37"] = (
 				refusal_reasons  # Refusal/dispute reasons (MDT-113 = code, MDT-126 = comment)
 			)
+		return cdar_dict
 
 	def _build_lifecycle_flow_info(self, filename, doc):
 		return {"flowSyntax": "CDAR", "name": filename}
