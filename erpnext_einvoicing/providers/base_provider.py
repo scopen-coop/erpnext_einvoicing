@@ -400,35 +400,41 @@ class BaseProvider(ABC):
 					pass
 
 		cdar_dict = {
-			"MDT-2": "REGULATED",
-			"MDT-3": "urn.cpro.gouv.fr:1p0:CDV:invoice",
-			"MDT-4": cdar_id,
-			"MDT-8": now,
-			"MDT-21": "WK",
-			"MDT-38": {"0002": buyer_siret},
-			"MDT-39": company_name,
-			"MDT-40": "BY",
-			"MDT-57": {"0002": supplier_siret},
-			"MDT-58": doc.supplier_name_raw or "",
-			"MDT-59": "SE",
-			"MDT-73": doc.get("supplier_uriid") or supplier_siret[:9],
-			"MDT-73-1": "0225",
-			"MDT-74": False,
-			"MDT-77": 23,
-			"MDT-78": now,
-			"MDT-87": doc.invoice_number or "",
-			"MDT-88": LIFECYCLE_STATUS_CODE_MAP.get(status_code, "45"),
-			"MDT-91": "380",
-			"MDT-100": invoice_date_dt.date() if invoice_date_dt else datetime.date.today(),
-			"MDT-105": status_code,
-			"MDT-106": LIFECYCLE_STATUS_MAP[status_code],
-			"MDT-129": {"0002": supplier_siret},
+			"MDT-2": "REGULATED",  # Business process (REGULATED = regulated B2B)
+			"MDT-3": "urn.cpro.gouv.fr:1p0:CDV:invoice",  # Guideline ID (CDV invoice profile)
+			"MDT-4": cdar_id,  # Unique CDAR identifier
+			"MDT-8": now,  # CDAR issue date/time
+			"MDT-21": "WK",  # CDAR sender role (WK = platform)
+			"MDT-38": {"0002": buyer_siret},  # Buyer SIRET (invoice recipient)
+			"MDT-39": company_name,  # Buyer name
+			"MDT-40": "BY",  # Buyer role (BY = buyer)
+			"MDT-57": {"0002": supplier_siret},  # Supplier SIRET (invoice issuer)
+			"MDT-58": doc.supplier_name_raw or "",  # Supplier name
+			"MDT-59": "SE",  # Supplier role (SE = seller)
+			"MDT-73": doc.get("supplier_uriid")
+			or supplier_siret[:9],  # Supplier directory identifier (URIID or SIREN)
+			"MDT-73-1": "0225",  # Directory identifier scheme (0225 = French SIREN/SIRET)
+			"MDT-74": False,  # Multiple references indicator
+			"MDT-77": 23,  # Acknowledgement document type (23 = acknowledgement)
+			"MDT-78": now,  # Acknowledgement issue date/time
+			"MDT-87": doc.invoice_number or "",  # Referenced invoice number
+			"MDT-88": LIFECYCLE_STATUS_CODE_MAP.get(
+				status_code, "45"
+			),  # UN/CEFACT status code (1=accepted, 45=in process, 47=paid...)
+			"MDT-91": "380",  # Referenced document type (380 = invoice, 381 = credit note)
+			"MDT-100": invoice_date_dt.date()
+			if invoice_date_dt
+			else datetime.date.today(),  # Original invoice date
+			"MDT-105": status_code,  # Lifecycle status code (204, 205, 210, 211...)
+			"MDT-106": LIFECYCLE_STATUS_MAP[status_code],  # Lifecycle status label
+			"MDT-129": {"0002": supplier_siret},  # Supplier legal identifier (SIRET)
 		}
 		if invoice_date_dt:
-			cdar_dict["MDT-95"] = invoice_date_dt
+			cdar_dict["MDT-95"] = invoice_date_dt  # Invoice receipt date/time
 		if refusal_reasons:
-			cdar_dict["MDG-37"] = refusal_reasons
-		return cdar_dict
+			cdar_dict["MDG-37"] = (
+				refusal_reasons  # Refusal/dispute reasons (MDT-113 = code, MDT-126 = comment)
+			)
 
 	def _build_lifecycle_flow_info(self, filename, doc):
 		return {"flowSyntax": "CDAR", "name": filename}
