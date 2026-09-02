@@ -2308,7 +2308,11 @@ async function refreshLifecycleLog(invoice) {
 					>
 						<i class="fa fa-file-text-o"></i> {{ invoice.purchase_invoice }}
 					</a>
-					<button class="btn btn-xs btn-danger ml-1" @click="cancelConversion(invoice)">
+					<button
+						v-if="invoice.last_lifecycle_log?.status_code === '204'"
+						class="btn btn-xs btn-danger ml-1"
+						@click="cancelConversion(invoice)"
+					>
 						<i class="fa fa-undo"></i> {{ __("Reset") }}
 					</button>
 				</div>

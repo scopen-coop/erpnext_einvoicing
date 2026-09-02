@@ -70,6 +70,7 @@ function _load_einvoicing_buttons(frm) {
 						)}"></i>`
 					);
 					$poll.on("click", () => {
+						frm.refresh();
 						frappe.call({
 							method: "erpnext_einvoicing.providers.sync.poll_single_lifecycle_log",
 							args: { log_name: info.log_name },
