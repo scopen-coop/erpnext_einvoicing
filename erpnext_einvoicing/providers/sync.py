@@ -267,6 +267,7 @@ def get_einvoicing_inbox(date_from=None, date_to=None, company=None):
 			"total_ttc",
 			"supplier_name_raw",
 			"supplier_siret",
+			"supplier_siren",
 			"supplier_vat",
 			"supplier_match_status",
 			"sirene_status",
@@ -697,7 +698,7 @@ def enrich_from_siret(name):
 
 	doc = frappe.get_doc("ePurchase Invoice", name)
 
-	siret = (doc.supplier_siret or "").replace(" ", "")
+	siret = (doc.supplier_siret or doc.supplier_siren or "").replace(" ", "")
 	if not siret:
 		return {"status": "error", "error": frappe._("No SIRET on this invoice.")}
 
@@ -708,7 +709,8 @@ def enrich_from_siret(name):
 	else:
 		ethirdparty = frappe.new_doc("eThirdParty")
 		ethirdparty.party_type = "Supplier"
-		ethirdparty.siret = siret
+		ethirdparty.siret = doc.supplier_siret or ""
+		ethirdparty.siren = doc.supplier_siren or ""
 		ethirdparty.vat_number = doc.supplier_vat or ""
 		ethirdparty.party_name = doc.supplier_name_raw or ""
 		ethirdparty.status = "pending"

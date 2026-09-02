@@ -1665,6 +1665,12 @@ async function refreshLifecycleLog(invoice) {
 							SIRET: {{ invoice.supplier_siret }}
 						</span>
 						<span
+							v-else-if="invoice.supplier_siren"
+							style="color: #888; font-size: 12px"
+						>
+							SIREN: {{ invoice.supplier_siren }}
+						</span>
+						<span
 							:class="`indicator-pill ${
 								{
 									unmatched: 'red',
@@ -1755,7 +1761,7 @@ async function refreshLifecycleLog(invoice) {
 									<i class="fa fa-link"></i> {{ __("Match") }}
 								</button>
 								<button
-									v-if="invoice.supplier_siret"
+									v-if="invoice.supplier_siret || invoice.supplier_siren"
 									class="btn btn-xs btn-default"
 									@click="enrichFromSiret(invoice)"
 								>
