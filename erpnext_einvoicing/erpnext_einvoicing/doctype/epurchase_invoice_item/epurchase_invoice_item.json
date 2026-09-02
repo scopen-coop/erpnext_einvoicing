@@ -25,7 +25,7 @@
  "fields": [
   {
    "fieldname": "item_description_raw",
-   "fieldtype": "Data",
+   "fieldtype": "Small Text",
    "label": "Description (Invoice)",
    "in_list_view": 1,
    "reqd": 1

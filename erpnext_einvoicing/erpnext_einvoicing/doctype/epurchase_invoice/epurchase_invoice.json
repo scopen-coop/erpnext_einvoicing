@@ -17,12 +17,12 @@
   "supplier_section",
   "supplier_name_raw",
   "supplier_siret",
+  "supplier_siren",
   "supplier_vat",
   "supplier_uriid",
   "supplier_address_raw",
   "column_break_supplier",
   "supplier_match_status",
-  "supplier_siret",
   "matched_supplier",
   "ethirdparty",
   "invoice_section",
@@ -130,6 +130,13 @@
    "fieldtype": "Data",
    "label": "SIRET",
    "read_only": 1
+  },
+  {
+   "fieldname": "supplier_siren",
+   "fieldtype": "Data",
+   "label": "SIREN",
+   "read_only": 1,
+   "insert_after": "supplier_siret"
   },
   {
    "fieldname": "supplier_vat",

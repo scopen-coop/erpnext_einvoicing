@@ -133,9 +133,10 @@ def _parse_cii(xml_bytes: bytes):
 	### Seller
 	seller_base = "//rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty"
 	supplier_name = get(f"{seller_base}/ram:Name/text()")
-	supplier_siret = get(f"{seller_base}/ram:SpecifiedLegalOrganization/ram:ID/text()") or get(
-		f"{seller_base}/ram:SpecifiedTaxRegistration[ram:ID/@schemeID='0002']/ram:ID/text()"
-	)
+	supplier_siret = get(f"{seller_base}/ram:GlobalID[@schemeID='0009']/text()")
+	supplier_siren = get(
+		f"{seller_base}/ram:SpecifiedLegalOrganization/ram:ID[@schemeID='0002']/text()"
+	) or get(f"{seller_base}/ram:SpecifiedTaxRegistration[ram:ID/@schemeID='0002']/ram:ID/text()")
 	supplier_vat = get(f"{seller_base}/ram:SpecifiedTaxRegistration[ram:ID/@schemeID='VA']/ram:ID/text()")
 	supplier_uriid = get(f"{seller_base}/ram:URIUniversalCommunication/ram:URIID/text()")
 
@@ -223,6 +224,7 @@ def _parse_cii(xml_bytes: bytes):
 		"currency": currency,
 		"supplier_name_raw": supplier_name,
 		"supplier_siret": supplier_siret,
+		"supplier_siren": supplier_siren,
 		"supplier_vat": supplier_vat,
 		"supplier_uriid": supplier_uriid,
 		"supplier_address_raw": supplier_address,
@@ -259,6 +261,7 @@ def _create_doc(data: dict, xml_bytes: bytes, flow_data: dict, pdf_content=None)
 	doc.currency = data.get("currency") or "EUR"
 	doc.supplier_name_raw = data.get("supplier_name_raw")
 	doc.supplier_siret = data.get("supplier_siret")
+	doc.supplier_siren = data.get("supplier_siren")
 	doc.supplier_vat = data.get("supplier_vat")
 	doc.supplier_uriid = data.get("supplier_uriid") or ""
 	doc.supplier_address_raw = data.get("supplier_address_raw")
@@ -315,11 +318,19 @@ def _auto_match_supplier(doc, data: dict):
 	4. Create eThirdParty in pending
 	"""
 	siret = data.get("supplier_siret", "").replace(" ", "")
+	siren = data.get("supplier_siren", "").replace(" ", "")
 	name_raw = data.get("supplier_name_raw", "")
 
 	### 1. Existing Supplier by SIRET
 	if siret:
 		supplier = frappe.db.get_value("Supplier", {"tax_id": siret}, "name")
+		if supplier:
+			doc.db_set("matched_supplier", supplier)
+			doc.db_set("supplier_match_status", "matched")
+			return
+
+	if siren:
+		supplier = frappe.db.get_value("Supplier", {"tax_id": siren}, "name")
 		if supplier:
 			doc.db_set("matched_supplier", supplier)
 			doc.db_set("supplier_match_status", "matched")

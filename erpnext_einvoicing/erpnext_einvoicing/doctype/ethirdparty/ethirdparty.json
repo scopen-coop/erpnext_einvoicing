@@ -10,6 +10,7 @@
   "status",
   "column_break_header",
   "siret",
+  "siren",
   "vat_number",
   "official_data_section",
   "party_name",
@@ -57,6 +58,13 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "SIRET"
+  },
+  {
+   "fieldname": "siren",
+   "fieldtype": "Data",
+   "label": "SIREN",
+   "read_only": 0,
+   "insert_after": "siret"
   },
   {
    "fieldname": "vat_number",
