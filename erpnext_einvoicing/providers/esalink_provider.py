@@ -117,3 +117,17 @@ class EsalinkProvider(BaseProvider):
 		if not api_key:
 			return {}
 		return {self.platform.api_key_header: api_key}
+
+	def _build_lifecycle_flow_info(self, filename, doc):
+		flow_info = {"flowSyntax": "CDAR", "name": filename, "processingRule": "B2B"}
+		if doc.get("raw_flow_data"):
+			import json
+
+			try:
+				flow_data = json.loads(doc.raw_flow_data)
+				tracking_id = flow_data.get("trackingId")
+				if tracking_id:
+					flow_info["trackingId"] = str(tracking_id)
+			except Exception:
+				pass
+		return flow_info
