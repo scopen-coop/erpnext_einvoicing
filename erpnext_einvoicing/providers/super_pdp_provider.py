@@ -133,13 +133,6 @@ class SuperPdpProvider(BaseProvider):
 		einvoice = create_e_purchase_invoice_from_xml(xml_content, flow_data)
 		self._save_flow_doc(flow_id, flow_data, sync_type, "ePurchase Invoice", einvoice.name)
 
-	def _build_lifecycle_flow_info(self, filename, doc):
-		return {
-			"flowSyntax": "CDAR",
-			"name": filename,
-			"processingRule": "NotApplicable",
-		}
-
 	### Extra headers
 
 	def _get_extra_headers(self):
