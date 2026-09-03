@@ -369,6 +369,7 @@ class BaseProvider(ABC):
 		now = datetime.datetime.now()
 		buyer_siret = (doc.buyer_siret or "").replace(" ", "")
 		supplier_siret = (doc.supplier_siret or doc.supplier_siren or "").replace(" ", "")
+		supplier_siren = supplier_siret[:9]
 
 		if not buyer_siret:
 			frappe.throw(
@@ -408,11 +409,11 @@ class BaseProvider(ABC):
 			"MDT-38": {"0002": buyer_siret},  # Buyer SIRET (invoice recipient)
 			"MDT-39": company_name,  # Buyer name
 			"MDT-40": "BY",  # Buyer role (BY = buyer)
-			"MDT-57": {"0002": supplier_siret},  # Supplier SIRET (invoice issuer)
+			"MDT-57": {"0002": supplier_siren},  # Supplier SIREN (invoice issuer)
 			"MDT-58": doc.supplier_name_raw or "",  # Supplier name
 			"MDT-59": "SE",  # Supplier role (SE = seller)
 			"MDT-73": doc.get("supplier_uriid")
-			or supplier_siret[:9],  # Supplier directory identifier (URIID or SIREN)
+			or supplier_siren,  # Supplier directory identifier (URIID or SIREN)
 			"MDT-73-1": "0225",  # Directory identifier scheme (0225 = French SIREN/SIRET)
 			"MDT-74": False,  # Multiple references indicator
 			"MDT-77": 23,  # Acknowledgement document type (23 = acknowledgement)
@@ -427,7 +428,7 @@ class BaseProvider(ABC):
 			else datetime.date.today(),  # Original invoice date
 			"MDT-105": status_code,  # Lifecycle status code (204, 205, 210, 211...)
 			"MDT-106": LIFECYCLE_STATUS_MAP[status_code],  # Lifecycle status label
-			"MDT-129": {"0002": supplier_siret},  # Supplier legal identifier (SIRET)
+			"MDT-129": {"0002": supplier_siren},  # Supplier legal identifier (SIRET)
 		}
 		if invoice_date_dt:
 			cdar_dict["MDT-95"] = invoice_date_dt  # Invoice receipt date/time
