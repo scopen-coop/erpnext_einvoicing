@@ -9,6 +9,7 @@ import frappe
 def after_install():
 	_create_esalink_platform()
 	_create_super_pdp_platform()
+	_configure_sandbox_mode()
 
 
 ### Private
@@ -65,3 +66,16 @@ def _create_super_pdp_platform():
 	)
 	doc.insert(ignore_permissions=True)
 	frappe.db.commit()
+
+
+def _configure_sandbox_mode():
+	answer = input("\n[ ERPNext eInvoicing ] Is this a production environment ? (yes/no) : ").strip().lower()
+	if answer not in ("yes", "y"):
+		from frappe.installer import update_site_config
+
+		update_site_config("einvoicing_force_sandbox", 1)
+		print(
+			"[ ERPNext eInvoicing ] Sandbox mode activated - einvoicing_force_sandbox set in site_config.json"
+		)
+	else:
+		print("[ ERPNext eInvoicing ] Production mode")

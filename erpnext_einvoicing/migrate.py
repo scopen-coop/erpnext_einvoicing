@@ -5,6 +5,7 @@ import frappe
 
 def after_migrate():
 	_create_uom_mappings()
+	_set_sandbox_system_message()
 
 
 ### Private
@@ -38,3 +39,14 @@ def _create_uom_mappings():
 		doc.erpnext_uom = erpnext_uom
 		doc.save(ignore_permissions=True)
 	frappe.db.commit()
+
+
+def _set_sandbox_system_message():
+	if not frappe.conf.get("einvoicing_force_sandbox"):
+		return
+	msg = frappe._("eInvoicing sandbox mode active - CDARs are sent to PA test environments")
+	frappe.db.set_single_value(
+		"System Settings",
+		"system_message",
+		f'<i class="fa fa-exclamation-triangle"></i> {msg}',
+	)

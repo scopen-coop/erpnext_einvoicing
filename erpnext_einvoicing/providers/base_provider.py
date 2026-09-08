@@ -72,11 +72,9 @@ class BaseProvider(ABC):
 	### Token helpers
 
 	def get_base_url(self):
-		url = (
-			self.platform.prod_api_url
-			if self.company_doc.einvoicing_live_mode
-			else self.platform.test_api_url
-		)
+		force_sandbox = frappe.conf.get("einvoicing_force_sandbox")
+		use_live = self.company_doc.einvoicing_live_mode and not force_sandbox
+		url = self.platform.prod_api_url if use_live else self.platform.test_api_url
 		if not url:
 			frappe.throw(
 				frappe._("API URL not configured on platform '{0}'.").format(self.platform.name),
