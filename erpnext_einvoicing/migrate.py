@@ -51,5 +51,5 @@ def _set_sandbox_system_message():
 		)
 		if live_companies:
 			names = ", ".join(live_companies)
-			content = f'<div style="background:#e74c3c;color:#fff; width:100%; text-align:center;padding:10px;font-weight:bold;"><i class="fa fa-exclamation-triangle"></i> eInvoicing: live mode enabled on a non-production site - CDARs will be redirected to test environments ({names})</div>'
+			content = f'<div style="background:#e74c3c;color:#fff; width:100%; text-align:center;padding:10px;font-weight:bold;"><i class="fa fa-exclamation-triangle"></i> eInvoicing: live mode enabled on a non-production site - all PA communications will be redirected to test environments ({names})</div>'
 	frappe.db.set_single_value("Navbar Settings", "announcement_widget", content)
