@@ -42,11 +42,14 @@ def _create_uom_mappings():
 
 
 def _set_sandbox_system_message():
-	if not frappe.conf.get("einvoicing_force_sandbox"):
-		return
-	msg = frappe._("eInvoicing sandbox mode active - CDARs are sent to PA test environments")
-	frappe.db.set_single_value(
-		"System Settings",
-		"system_message",
-		f'<i class="fa fa-exclamation-triangle"></i> {msg}',
-	)
+	content = ""
+	if frappe.conf.get("einvoicing_force_sandbox"):
+		live_companies = frappe.db.get_all(
+			"Company",
+			filters={"einvoicing_live_mode": 1},
+			pluck="name",
+		)
+		if live_companies:
+			names = ", ".join(live_companies)
+			content = f'<div style="background:#e74c3c;color:#fff; width:100%; text-align:center;padding:10px;font-weight:bold;"><i class="fa fa-exclamation-triangle"></i> eInvoicing: live mode enabled on a non-production site - CDARs will be redirected to test environments ({names})</div>'
+	frappe.db.set_single_value("Navbar Settings", "announcement_widget", content)
