@@ -979,14 +979,10 @@ async function cancelConversion(invoice) {
 
 function promptRefuse(invoice) {
 	if (invoice.is_credit_note) {
-		const ref_status = invoice.ref_status;
-		if (
-			!invoice.referenced_epurchase_invoice ||
-			ref_status === "pending" ||
-			ref_status === "ready"
-		) {
+		const blockReason = creditNoteBlockReason(invoice);
+		if (blockReason) {
 			frappe.msgprint({
-				message: creditNoteBlockReason(invoice),
+				message: blockReason,
 				indicator: "orange",
 				title: __("Action not allowed"),
 			});
@@ -1195,11 +1191,15 @@ async function unlinkItemPR(invoice, item) {
 	await fetchInvoices(true);
 }
 
+function creditNoteWarning(invoice) {
+	if (!invoice.is_credit_note) return null;
+	if (!invoice.referenced_epurchase_invoice) return __("Referenced invoice not found");
+	return null;
+}
+
 function creditNoteBlockReason(invoice) {
 	if (!invoice.is_credit_note) return null;
 	const ref_status = invoice.ref_status;
-	if (!invoice.referenced_epurchase_invoice)
-		return __("Referenced invoice not found - cannot process this credit note");
 	if (ref_status === "refused")
 		return __("Referenced invoice {0} was refused - you must refuse this credit note", [
 			invoice.referenced_invoice_number,
@@ -2251,11 +2251,14 @@ async function refreshLifecycleLog(invoice) {
 					"
 				>
 					<div
-						v-if="invoice.is_credit_note && creditNoteBlockReason(invoice)"
+						v-if="
+							invoice.is_credit_note &&
+							(creditNoteBlockReason(invoice) || creditNoteWarning(invoice))
+						"
 						style="color: #888; font-size: 12px"
 					>
 						<i class="fa fa-exclamation-triangle" style="color: #f0ad4e"></i>
-						{{ creditNoteBlockReason(invoice) }}
+						{{ creditNoteBlockReason(invoice) || creditNoteWarning(invoice) }}
 					</div>
 					<div
 						style="display: flex; justify-content: space-between; align-items: center"
