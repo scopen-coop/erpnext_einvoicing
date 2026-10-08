@@ -1,5 +1,4 @@
 eInvoicing,Facturation électronique,
-source,translation,context,
 API Key is not configured.,La clé API n'est pas configurée.,
 API URL not configured on platform '{0}'.,URL API non configurée sur la plateforme '{0}'.,
 Access token deleted.,Jeton d'accès supprimé.,
