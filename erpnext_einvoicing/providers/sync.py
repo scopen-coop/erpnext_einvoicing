@@ -74,9 +74,9 @@ def check_pending_flows(sync_type="Purchase Invoice", company=None):
 
 
 @frappe.whitelist()
-def sync_flows(sync_type="Purchase Invoice", company=None):
+def sync_flows(sync_type="Purchase Invoice", company=None, since=None):
 	frappe.only_for("System Manager")
-	return _get_provider(company).sync_flows(sync_type)
+	return _get_provider(company).sync_flows(sync_type, since=since)
 
 
 ### Inbox whitelisted methods
