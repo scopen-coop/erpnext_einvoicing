@@ -1,4 +1,22 @@
 frappe.ui.form.on("Company", {
+	onload(frm) {
+		frm._einvoicing_live_mode = frm.doc.einvoicing_live_mode;
+	},
+
+	after_save(frm) {
+		if (frm.doc.einvoicing_live_mode === frm._einvoicing_live_mode) return;
+		frm._einvoicing_live_mode = frm.doc.einvoicing_live_mode;
+
+		frappe.call("erpnext_einvoicing.doc_events.company.get_sandbox_banner").then((r) => {
+			// Retire le bandeau actuel (natif ou injecté)
+			$(".einvoicing-sandbox-banner").closest(".announcement-widget").remove();
+			$(".einvoicing-sandbox-banner").remove();
+
+			if (r.message) {
+				$("header.navbar").after(`<div class="announcement-widget">${r.message}</div>`);
+			}
+		});
+	},
 	refresh(frm) {
 		if (!frm.doc.__islocal && frm.doc.einvoicing_approved_platform) {
 			frm.fields_dict.einvoicing_healthcheck.$input.html(

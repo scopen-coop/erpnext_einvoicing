@@ -69,9 +69,17 @@ def _create_super_pdp_platform():
 
 
 def _configure_sandbox_mode():
-	answer = input("\n[ ERPNext eInvoicing ] Is this a production environment ? (yes/no) : ").strip().lower()
+	try:
+		answer = (
+			input("\n[ ERPNext eInvoicing ] Is this a production environment ? (yes/no) : ").strip().lower()
+		)
+	except EOFError:
+		answer = "no"
+
 	if answer not in ("yes", "y"):
 		from frappe.installer import update_site_config
+
+		frappe.db.set_value("Company", {"name": ("is", "set")}, "einvoicing_live_mode", 0)
 
 		update_site_config("einvoicing_force_sandbox", 1)
 		print(

@@ -72,8 +72,7 @@ class BaseProvider(ABC):
 	### Token helpers
 
 	def get_base_url(self):
-		force_sandbox = frappe.conf.get("einvoicing_force_sandbox")
-		use_live = self.company_doc.einvoicing_live_mode and not force_sandbox
+		use_live = self.company_doc.einvoicing_live_mode
 		url = self.platform.prod_api_url if use_live else self.platform.test_api_url
 		if not url:
 			frappe.throw(
@@ -115,6 +114,7 @@ class BaseProvider(ABC):
 
 		base_url = self.get_base_url()
 		url = f"{base_url}{resource}"
+		print(url)
 
 		headers = {
 			"Authorization": f"Bearer {self.company_doc.get_password('einvoicing_access_token')}",
