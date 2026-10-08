@@ -114,7 +114,6 @@ class BaseProvider(ABC):
 
 		base_url = self.get_base_url()
 		url = f"{base_url}{resource}"
-		print(url)
 
 		headers = {
 			"Authorization": f"Bearer {self.company_doc.get_password('einvoicing_access_token')}",
