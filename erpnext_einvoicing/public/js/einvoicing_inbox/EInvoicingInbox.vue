@@ -193,12 +193,12 @@ async function checkPendingFlows() {
 	}
 }
 
-async function syncFlows() {
+async function syncFlows(since = null) {
 	syncing.value = true;
 	try {
 		const r = await frappe.call({
 			method: "erpnext_einvoicing.providers.sync.sync_flows",
-			args: { sync_type: "Purchase Invoice", company: company.value },
+			args: { sync_type: "Purchase Invoice", company: company.value, since },
 		});
 		const msg = r.message || {};
 		const indicator = msg.status === "ok" ? "green" : "orange";
@@ -208,6 +208,16 @@ async function syncFlows() {
 	} finally {
 		syncing.value = false;
 	}
+}
+
+/*** Sync since date ***/
+function syncSince() {
+	frappe.prompt(
+		{ fieldname: "since", fieldtype: "Date", label: __("Since"), reqd: 1 },
+		(values) => syncFlows(values.since),
+		__("Sync since"),
+		__("Sync")
+	);
 }
 
 function promptMatchSupplier(invoice) {
@@ -1461,37 +1471,56 @@ async function refreshLifecycleLog(invoice) {
 				>
 					<i class="fa fa-arrow-circle-o-right"></i> {{ __("Convert All") }}
 				</button>
-				<button class="btn btn-sm btn-default" :disabled="syncing" @click="syncFlows">
-					<i :class="['fa', syncing ? 'fa-spinner fa-spin' : 'fa-refresh']"></i>
-					{{ __("Sync") }}
-					<span style="display: inline-flex; align-items: center; margin-left: 4px">
-						<span
-							v-if="pendingFlowsStatus === 'pending'"
-							style="font-size: 11px; color: #f0ad4e"
-							:title="pendingFlows + ' ' + __('invoices pending')"
-						>
-							<i class="fa fa-circle" style="font-size: 8px"></i>
-							{{ pendingFlows }}
+				<div class="btn-group">
+					<button
+						class="btn btn-sm btn-default"
+						:disabled="syncing"
+						@click="syncFlows()"
+					>
+						<i :class="['fa', syncing ? 'fa-spinner fa-spin' : 'fa-refresh']"></i>
+						{{ __("Sync") }}
+						<span style="display: inline-flex; align-items: center; margin-left: 4px">
+							<span
+								v-if="pendingFlowsStatus === 'pending'"
+								style="font-size: 11px; color: #f0ad4e"
+								:title="pendingFlows + ' ' + __('invoices pending')"
+							>
+								<i class="fa fa-circle" style="font-size: 8px"></i>
+								{{ pendingFlows }}
+							</span>
+							<span
+								v-else-if="pendingFlowsStatus === 'ok'"
+								style="font-size: 11px; color: #5cb85c"
+								:title="__('Up to date')"
+							>
+								<i class="fa fa-check" style="font-size: 10px"></i>
+							</span>
+							<span
+								v-else-if="pendingFlowsStatus === 'error'"
+								style="font-size: 11px; color: #d9534f"
+								:title="__('Provider error')"
+							>
+								<i
+									class="fa fa-exclamation-circle"
+									style="font-size: 10px; opacity: 0.7"
+								></i>
+							</span>
 						</span>
-						<span
-							v-else-if="pendingFlowsStatus === 'ok'"
-							style="font-size: 11px; color: #5cb85c"
-							:title="__('Up to date')"
-						>
-							<i class="fa fa-check" style="font-size: 10px"></i>
-						</span>
-						<span
-							v-else-if="pendingFlowsStatus === 'error'"
-							style="font-size: 11px; color: #d9534f"
-							:title="__('Provider error')"
-						>
-							<i
-								class="fa fa-exclamation-circle"
-								style="font-size: 10px; opacity: 0.7"
-							></i>
-						</span>
-					</span>
-				</button>
+					</button>
+					<button
+						class="btn btn-sm btn-default"
+						data-toggle="dropdown"
+						:disabled="syncing"
+						style="padding-left: 6px; padding-right: 6px"
+					>
+						<i class="fa fa-caret-down"></i>
+					</button>
+					<ul class="dropdown-menu dropdown-menu-right">
+						<li>
+							<a class="dropdown-item" @click="syncSince">{{ __("Since...") }}</a>
+						</li>
+					</ul>
+				</div>
 			</div>
 		</div>
 

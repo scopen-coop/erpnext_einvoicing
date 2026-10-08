@@ -4,10 +4,11 @@
 import datetime
 from abc import ABC, abstractmethod
 from datetime import timedelta
+from zoneinfo import ZoneInfo
 
 import frappe
 import requests
-from frappe.utils import add_to_date, get_datetime, now_datetime
+from frappe.utils import add_to_date, get_datetime, get_system_timezone, now_datetime
 
 LIFECYCLE_STATUS_MAP = {
 	"204": "Acknowledged",
@@ -181,8 +182,8 @@ class BaseProvider(ABC):
 		total = result["response"].get("total", 0)
 		return {"has_pending": total > 0, "total": total}
 
-	def sync_flows(self, sync_type, company=None):
-		payload = self._build_search_payload(sync_type, limit=1000)
+	def sync_flows(self, sync_type, company=None, since=None):
+		payload = self._build_search_payload(sync_type, limit=1000, since=since)
 		result = self.call_api("flows/search", "POST", params=payload)
 		if result["status_code"] not in (200, 202):
 			return {
@@ -292,7 +293,11 @@ class BaseProvider(ABC):
 		doc.flows_error = errors
 		doc.insert(ignore_permissions=True)
 
-	def _build_search_payload(self, sync_type, limit=100):
+	def _to_utc_iso(self, dt):
+		local = get_datetime(dt).replace(tzinfo=ZoneInfo(get_system_timezone()))
+		return local.astimezone(ZoneInfo("UTC")).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+	def _build_search_payload(self, sync_type, limit=100, since=None):
 		last_sync_date = frappe.db.get_value(
 			"eInvoicing Sync Log",
 			filters={
@@ -303,11 +308,10 @@ class BaseProvider(ABC):
 			fieldname="last_sync_date",
 			order_by="last_sync_date desc",
 		)
-		updated_after = (
-			get_datetime(last_sync_date).strftime("%Y-%m-%dT%H:%M:%S.000Z")
-			if last_sync_date
-			else "1970-01-01T00:00:00.000Z"
-		)
+		if since:
+			updated_after = self._to_utc_iso(since)
+		else:
+			updated_after = self._to_utc_iso(last_sync_date) if last_sync_date else "1970-01-01T00:00:00.000Z"
 		return {
 			"where": {
 				"updatedAfter": updated_after,
