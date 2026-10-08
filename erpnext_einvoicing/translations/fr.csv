@@ -331,4 +331,4 @@ Match a supplier first,Associez d'abord un fournisseur,
 Referenced invoice {0} was refused - you must refuse this credit note,La facture de référence {0} a été refusée - vous devez refuser cet avoir,
 Referenced invoice {0} must be accepted before processing this credit note,La facture de référence {0} doit être traitée avant de pouvoir traiter cet avoir,
 Referenced invoice not found,Facture de référence introuvable,
-eInvoicing sandbox mode active - CDARs are sent to PA test environments,Mode sandbox eInvoicing actif - les CDARs pointent sur les environnements de test des PA
+"eInvoicing: live mode enabled on a non-production site - REAL communications are sent to the PA ({0}). Will be reset to sandbox on next migrate.","eInvoicing : mode réel activé sur un site hors production - des communications RÉELLES sont envoyées à la PA ({0}). Le mode sandbox sera rétabli à la prochaine migration."

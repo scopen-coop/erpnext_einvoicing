@@ -188,6 +188,9 @@ doctype_js = {
 # Hook on document methods and events
 
 doc_events = {
+	"Company": {
+		"on_update": "erpnext_einvoicing.doc_events.company.on_update",
+	},
 	"Custom Field": {
 		# Supplier
 		"after_insert": "erpnext_einvoicing.doc_events.custom_field_supplier.on_create",
